@@ -2,7 +2,7 @@ const express = require("express");
 const upload = require("../middleware/multer");
 const router = express.Router();
 
-// const verifyToken = require("../middleware/authToken"); // Optional, if needed
+const verifyToken = require("../middleware/authToken"); // Optional, if needed
 
 const {
   saveCategory,
@@ -39,5 +39,5 @@ router.delete("/deleteEntity/:catId/:subId/:subSubId", deleteEntity);
 router.patch("/toggleStatus/:catId/:subId/:subSubId", toggleStatus);
 
 // ---------------- PRODUCT ROUTES ----------------
-router.post("/addProduct", upload, addProduct);
+router.post("/addProduct", upload,verifyToken, addProduct);
 module.exports = router;
