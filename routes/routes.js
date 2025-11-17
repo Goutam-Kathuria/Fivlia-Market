@@ -14,7 +14,7 @@ const {
 
 // ---------------- AUTH ROUTES ----------------
 const { register, login } = require("../controlers/authControler");
-const { addProduct } = require("../controlers/productControler");
+const { addProduct, getProduct } = require("../controlers/productControler");
 router.post("/register", register);
 router.post("/login", login);
 
@@ -40,4 +40,5 @@ router.patch("/toggleStatus/:catId/:subId/:subSubId", toggleStatus);
 
 // ---------------- PRODUCT ROUTES ----------------
 router.post("/addProduct", upload,verifyToken, addProduct);
+router.get("/getProduct", getProduct);
 module.exports = router;

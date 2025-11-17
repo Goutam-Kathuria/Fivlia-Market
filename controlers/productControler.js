@@ -35,7 +35,7 @@ exports.getProduct = async (req, res) => {
       filter.category = categoryId;  // since category is an array of ObjectIds
     }
 
-    const products = await Product.find(filter)
+    const product = await products.find(filter)
       .populate("category")
       .populate("subCategory")
       .populate("subSubCategory")
@@ -44,8 +44,8 @@ exports.getProduct = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      count: products.length,
-      products
+      count: product.length,
+      product
     });
 
   } catch (error) {
