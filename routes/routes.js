@@ -13,11 +13,12 @@ const {
 } = require("../controlers/categoryControler");
 
 // ---------------- AUTH ROUTES ----------------
-const { register, login } = require("../controlers/authControler");
+const { register, login, getUsers} = require("../controlers/authControler");
 const { addProduct, getProduct } = require("../controlers/productControler");
 router.post("/register", register);
 router.post("/login", login);
 
+router.get("/getUsers", getUsers);
 // ---------------- CATEGORY ROUTES ----------------
 
 // Create or Update Category

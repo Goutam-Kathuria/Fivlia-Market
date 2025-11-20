@@ -62,3 +62,13 @@ exports.login = async (req, res) => {
       .json({ message: "Server error", error: err.message });
   }
 };
+
+exports.getUsers = async (req, res) => {
+  try {
+    const users = await User.find()
+    return res.status(200).json({message:"Users",users})
+  } catch (error) {
+    console.error("Error creating store:", err);
+    return res.status(500).json({ message: "Server error", error: err.message }); 
+  }
+}

@@ -11,5 +11,5 @@ const productSchema = new mongoose.Schema({
   price:Number,
   address:String,
   userId:{type: mongoose.Schema.Types.ObjectId, ref: "User"}
-});
+},{timestamps:true});
 module.exports = mongoose.model("product", productSchema);

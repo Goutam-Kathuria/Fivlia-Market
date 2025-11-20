@@ -9,7 +9,6 @@ const connectDb = require("./database");
 // const registerDriverSocket = require("./socket/socket");
 const cors = require("cors");
 // const { initAgenda } = require('./config/agenda'); // ✅ your agenda setup
-connectDb();
 
 const app = express();
 app.use(cors());
@@ -42,9 +41,9 @@ const startServer = async () => {
   // backgroundInvoice(agenda);
 
   const PORT = process.env.PORT || 8090;
-  const host = process.env.HOST || "0.0.0.0";
-  app.listen(PORT, () => {
-    console.log(`Server running at http://${host}:${PORT}`);
+  const HOST = process.env.HOST || "0.0.0.0";
+  app.listen(PORT,HOST, () => {
+    console.log(`Server running at http://${HOST}:${PORT}`);
     console.log(`✅ Access from same network: http://192.168.29.124:${PORT}`);
   });
 };

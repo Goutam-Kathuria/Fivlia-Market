@@ -21,29 +21,46 @@ exports.addProduct = async (req,res) => {
 
 exports.getProduct = async (req, res) => {
   try {
-    const { userId, categoryId } = req.query;
+    const { userId, categoryId, page = 1, limit = 10 } = req.query;
 
     let filter = {};
 
-    // If userId provided → filter by user products
-    if (userId) {
-      filter.userId = userId;
+    if (userId) filter.userId = userId;
+
+    if (categoryId) filter.category = categoryId;
+
+    let usePagination = false;
+
+    // Apply pagination ONLY if no filters used
+    if (!userId && !categoryId) {
+      usePagination = true;
     }
 
-    // If categoryId provided → match inside category array
-    if (categoryId) {
-      filter.category = categoryId;  // since category is an array of ObjectIds
-    }
-
-    const product = await products.find(filter)
+    let query = products.find(filter)
       .populate("category")
       .populate("subCategory")
       .populate("subSubCategory")
       .populate("userId")
       .sort({ createdAt: -1 });
 
+    let total = 0;
+
+    if (usePagination) {
+      total = await products.countDocuments(filter);
+
+      const skip = (page - 1) * limit;
+      query = query.skip(skip).limit(Number(limit));
+    }
+
+    const product = await query;
+
     return res.status(200).json({
       success: true,
+      paginationApplied: usePagination,
+      total: usePagination ? total : product.length,
+      page: usePagination ? Number(page) : null,
+      limit: usePagination ? Number(limit) : null,
+      totalPages: usePagination ? Math.ceil(total / limit) : null,
       count: product.length,
       product
     });
