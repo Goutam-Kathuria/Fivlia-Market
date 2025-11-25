@@ -11,7 +11,7 @@ const {
   deleteEntity,
   toggleStatus
 } = require("../controlers/categoryControler");
-const { banner, getBanner } = require("../controlers/bannerControler");
+const { banner, getBanner, getAllBanner, updateBannerStatus } = require("../controlers/bannerControler");
 
 const { saveLocation } = require("../controlers/locationControler");
 // ---------------- AUTH ROUTES ----------------
@@ -52,6 +52,9 @@ router.get("/getProduct", getProduct);
 // ---------------- BANNER ROUTES ----------------
 // Add or Update BANNER
 router.post("/addBanner", upload, banner);
+router.put("/update-banner-status/:id", upload, updateBannerStatus); 
+
 router.get("/getBanner",verifyToken, getBanner);
+router.get("/get-all-banner", getAllBanner);
 
 module.exports = router;
