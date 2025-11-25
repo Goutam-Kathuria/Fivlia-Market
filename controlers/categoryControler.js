@@ -86,29 +86,13 @@ exports.getCategories = async (req, res) => {
 // ---------------- DELETE ANY LEVEL (CAT / SUB / SUB-SUB) ----------------
 exports.deleteEntity = async (req, res) => {
   try {
-    const { catId, subId, subSubId } = req.params;
+    const { catId, subId } = req.params;
     if (!catId)
       return res.status(400).json({ message: "❌ Category ID is required" });
 
     const category = await Category.findById(catId);
     if (!category)
       return res.status(404).json({ message: "❌ Category not found" });
-
-    // Delete sub–subcategory
-    if (subId && subSubId) {
-      const sub = category.subcat.id(subId);
-      if (!sub)
-        return res.status(404).json({ message: "❌ Subcategory not found" });
-      const subsub = sub.subsubcat.id(subSubId);
-      if (!subsub)
-        return res
-          .status(404)
-          .json({ message: "❌ Sub–subcategory not found" });
-
-      subsub.deleteOne();
-      await category.save();
-      return res.json({ message: "✅ Sub–subcategory deleted successfully" });
-    }
 
     // Delete subcategory
     if (subId) {
@@ -133,7 +117,7 @@ exports.deleteEntity = async (req, res) => {
 // ---------------- ADD OR UPDATE SUB / SUB–SUB CATEGORY ----------------
 exports.saveSubEntity = async (req, res) => {
   try {
-    const { catId, subId, subSubId } = req.params;
+    const { catId, subId } = req.params;
     const { name, description, attribute, commison, status } =
       req.body;
     const image = `/${req.files?.image?.[0]?.key}` || req.body.image || "";
@@ -141,32 +125,6 @@ exports.saveSubEntity = async (req, res) => {
     const category = await Category.findById(catId);
     if (!category)
       return res.status(404).json({ message: "❌ Category not found" });
-
-    // Update Sub–Subcategory
-    if (subId && subSubId) {
-      const sub = category.subcat.id(subId);
-      if (!sub)
-        return res.status(404).json({ message: "❌ Subcategory not found" });
-      const subsub = sub.subsubcat.id(subSubId);
-      if (!subsub)
-        return res
-          .status(404)
-          .json({ message: "❌ Sub–subcategory not found" });
-
-      Object.assign(subsub, {
-        name,
-        description,
-        attribute,
-        commison,
-        status,
-        image,
-      });
-      await category.save();
-      return res.json({
-        message: "✅ Sub–subcategory updated successfully",
-        subsub,
-      });
-    }
 
     // Update Subcategory
     if (subId) {
@@ -212,16 +170,15 @@ exports.saveSubEntity = async (req, res) => {
 // ---------------- TOGGLE STATUS (GENERIC) ----------------
 exports.toggleStatus = async (req, res) => {
   try {
-    const { catId, subId, subSubId } = req.params;
+    const { catId, subId } = req.params;
 
     const category = await Category.findById(catId);
     if (!category)
       return res.status(404).json({ message: "❌ Category not found" });
 
     let target = category;
-    if (subId && subSubId)
-      target = category.subcat.id(subId).subsubcat.id(subSubId);
-    else if (subId) target = category.subcat.id(subId);
+
+    if (subId) target = category.subcat.id(subId);
 
     if (!target)
       return res.status(404).json({ message: "❌ Target entity not found" });

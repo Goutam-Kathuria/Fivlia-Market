@@ -13,7 +13,7 @@ const {
 } = require("../controlers/categoryControler");
 
 // ---------------- AUTH ROUTES ----------------
-const { register, login, getUsers} = require("../controlers/authControler");
+const { register, login, getUsers, getProfile } = require("../controlers/authControler");
 const { addProduct, getProduct } = require("../controlers/productControler");
 router.post("/register", register);
 router.post("/login", login);
@@ -29,17 +29,19 @@ router.get("/getCategories", getCategories);
 
 // ---------------- SUB / SUB–SUB CATEGORY ROUTES ----------------
 // Add or Update Sub / Sub–Subcategory
-router.post("/saveSubEntity/:catId/:subId/:subSubId", upload, saveSubEntity);
+router.post("/saveSubEntity/:catId/:subId", upload, saveSubEntity);
 
 // ---------------- DELETE ROUTE ----------------
 // Delete Category / Subcategory / Sub–Subcategory (based on params)
-router.delete("/deleteEntity/:catId/:subId/:subSubId", deleteEntity);
+router.delete("/deleteEntity/:catId/:subId", deleteEntity);
 
 // ---------------- STATUS TOGGLE ----------------
 // Toggle Category/Sub/Sub–Sub Status
-router.patch("/toggleStatus/:catId/:subId/:subSubId", toggleStatus);
+router.patch("/toggleStatus/:catId/:subId", toggleStatus);
 
 // ---------------- PRODUCT ROUTES ----------------
 router.post("/addProduct", upload,verifyToken, addProduct);
 router.get("/getProduct", getProduct);
+
+router.get("/getProfile", verifyToken, getProfile);
 module.exports = router;

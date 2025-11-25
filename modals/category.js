@@ -1,20 +1,9 @@
 const mongoose = require('mongoose');
 
-const subSubCategorySchema = new mongoose.Schema({
-  name:String,
-  description:String,
-  image: String,
-  attribute:[{type:String}],
-  status:{type:Boolean,default:true},
-  commison:Number
-});
-
-
 const subCategorySchema = new mongoose.Schema({
   name:String,
   image: String,
   description:String,
-  subsubcat: [subSubCategorySchema],
   attribute:[{type:String}],
   status:{type:Boolean,default:true},
   commison:Number

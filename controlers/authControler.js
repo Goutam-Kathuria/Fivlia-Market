@@ -51,10 +51,7 @@ exports.login = async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES_IN }
     );
 
-    return res
-      .status(200)
-      .json({ message: "Login Successfully", token });
-
+    return res.status(200).json({ message: "Login Successfully", token });
   } catch (error) {
     console.error("Error creating store:", err);
     return res
@@ -65,10 +62,25 @@ exports.login = async (req, res) => {
 
 exports.getUsers = async (req, res) => {
   try {
-    const users = await User.find()
-    return res.status(200).json({message:"Users",users})
+    const users = await User.find();
+    return res.status(200).json({ message: "Users", users });
   } catch (error) {
     console.error("Error creating store:", err);
-    return res.status(500).json({ message: "Server error", error: err.message }); 
+    return res
+      .status(500)
+      .json({ message: "Server error", error: err.message });
   }
-}
+};
+
+exports.getProfile = async (req, res) => {
+  try {
+    let userId = req.user;
+    const user = await User.findById(userId);
+    return res.status(200).json({ message: "Users", user });
+  } catch (error) {
+    console.error("Error creating store:", err);
+    return res
+      .status(500)
+      .json({ message: "Server error", error: err.message });
+  }
+};
