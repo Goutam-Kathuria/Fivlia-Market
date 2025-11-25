@@ -4,6 +4,8 @@ const userSchema = new mongoose.Schema({
     password:{type:String},
     mobileNumber:{type:String},
     email:{type:String},
-    adharCardNumber:Number
+    adharCardNumber:Number,
+    latitude:Number,
+    longitude:Number
 },{timestamps:true})
 module.exports=mongoose.model('User',userSchema)

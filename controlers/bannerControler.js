@@ -1,4 +1,7 @@
 const Banner = require("../modals/banner");
+const User = require("../modals/user");
+const Category = require("../modals/category");
+const { getBannersWithinRadius } = require("../utils/location");
 
 exports.banner = async (req, res) => {
   try {
@@ -35,11 +38,6 @@ exports.banner = async (req, res) => {
         if (!foundSubCategory)
           return res.status(204).json({ message: `SubCategory ${subCategory} not found` });
 
-    let slug = "";
-    if (foundCategory) {
-      slug = `/category/${foundCategory._id}`;
-      if (foundSubCategory) slug += `/${foundSubCategory._id}`;
-    }
     const newBanner = await Banner.create({
       image,
       title,
@@ -49,7 +47,6 @@ exports.banner = async (req, res) => {
         ? {
             _id: foundCategory._id,
             name: foundCategory.name,
-            slug: slugify(foundCategory.name, { lower: true }),
           }
         : null,
 
@@ -57,7 +54,6 @@ exports.banner = async (req, res) => {
         ? {
             _id: foundSubCategory._id,
             name: foundSubCategory.name,
-            slug: slugify(foundSubCategory.name, { lower: true }),
           }
         : null,
 
@@ -80,25 +76,14 @@ exports.getBanner = async (req, res) => {
     const userId = req.user;
 
     const user = await User.findById(userId).lean();
-    if (!user || !user.location?.latitude || !user.location?.longitude) {
+
+    if (!user || !user?.latitude || !user?.longitude) {
       // console.log("❌ User location missing or incomplete");
       return res.status(400).json({ message: "User location not found" });
     }
 
-    const userLat = user.location.latitude;
-    const userLng = user.location.longitude;
-
-    // 🟢 Get active zone IDs
-    const zoneDocs = await ZoneData.find({ status: true }, "zones").lean();
-    const activeZoneIds = [];
-    zoneDocs.forEach((doc) => {
-      (doc.zones || []).forEach((zone) => {
-        if (zone.status && zone._id) {
-          activeZoneIds.push(zone._id.toString());
-        }
-      });
-    });
-    // console.log("📍 Active Zone IDs:", activeZoneIds);
+    const userLat = user.latitude;
+    const userLng = user.longitude;
 
     // 🔎 Apply base filters
     const filters = { status: true };
@@ -120,8 +105,6 @@ exports.getBanner = async (req, res) => {
       userLng,
       allBanners
     );
-    // console.log(matchedBanners)
-    // console.log("🎯 All banners fetched:", allBanners.length);
 
     if (!matchedBanners.length) {
       return res.status(200).json({
@@ -206,7 +189,6 @@ exports.updateBannerStatus = async (req, res) => {
       updateData.brand = {
         _id: foundBrand._id,
         name: foundBrand.brandName,
-        slug: slugify(foundBrand.brandName, { lower: true }),
       };
     }
 
@@ -227,7 +209,6 @@ exports.updateBannerStatus = async (req, res) => {
       updateData.mainCategory = {
         _id: foundCategory._id,
         name: foundCategory.name,
-        slug: slugify(foundCategory.name, { lower: true }),
       };
 
       if (subCategory) {
@@ -242,7 +223,6 @@ exports.updateBannerStatus = async (req, res) => {
         updateData.subCategory = {
           _id: foundSubCategory._id,
           name: foundSubCategory.name,
-          slug: slugify(foundSubCategory.name, { lower: true }),
         };
 
         if (subSubCategory) {
@@ -257,7 +237,6 @@ exports.updateBannerStatus = async (req, res) => {
           updateData.subSubCategory = {
             _id: foundSubSubCategory._id,
             name: foundSubSubCategory.name,
-            slug: slugify(foundSubSubCategory.name, { lower: true }),
           };
         }
       }
