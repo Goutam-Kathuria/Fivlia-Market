@@ -1,27 +1,48 @@
-const products = require('../modals/product')
+const products = require("../modals/product");
 
-exports.addProduct = async (req,res) => {
-    try{
-    let userId = req.user
+exports.addProduct = async (req, res) => {
+  try {
+    let userId = req.user;
     let {
-    name,description,category,subCategory,subSubCategory,price,address
-    } = req.body
-    const image = `/${req.files?.MultipleImage?.[0]?.key}` || req.body.MultipleImage || ""
+      name,
+      description,
+      category,
+      subCategory,
+      subSubCategory,
+      price,
+      address,
+    } = req.body;
+    const image =
+      `/${req.files?.MultipleImage?.[0]?.key}` || req.body.MultipleImage || "";
     category = category || null;
     subCategory = subCategory || null;
     subSubCategory = subSubCategory || null;
     userId = userId || null;
-    const newProduct = await products.create({name,description,category,subCategory,subSubCategory,price,address,userId,image})
-    return res.status(200).json({message:'Product Added Successfully'},newProduct)
-    }catch(error){
-    console.error(error)
-    return res.status(500).json({ message: "❌ Failed to Add Product", error: error.message });
-    }
-}
+    const newProduct = await products.create({
+      name,
+      description,
+      category,
+      subCategory,
+      subSubCategory,
+      price,
+      address,
+      userId,
+      image,
+    });
+    return res
+      .status(200)
+      .json({ message: "Product Added Successfully" }, newProduct);
+  } catch (error) {
+    console.error(error);
+    return res
+      .status(500)
+      .json({ message: "❌ Failed to Add Product", error: error.message });
+  }
+};
 
 exports.getProduct = async (req, res) => {
   try {
-    const { userId, categoryId, page = 1, limit = 10 } = req.query;
+    const { userId, categoryId, page = 1, limit = 10, search } = req.query;
 
     let filter = {};
 
@@ -29,14 +50,23 @@ exports.getProduct = async (req, res) => {
 
     if (categoryId) filter.category = categoryId;
 
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { address: { $regex: search, $options: "i" } },
+      ];
+    }
+
     let usePagination = false;
 
     // Apply pagination ONLY if no filters used
-    if (!userId && !categoryId) {
+    if (!userId && !categoryId && !search) {
       usePagination = true;
     }
 
-    let query = products.find(filter)
+    let query = products
+      .find(filter)
       .populate("category")
       .populate("subCategory")
       .populate("subSubCategory")
@@ -62,14 +92,13 @@ exports.getProduct = async (req, res) => {
       limit: usePagination ? Number(limit) : null,
       totalPages: usePagination ? Math.ceil(total / limit) : null,
       count: product.length,
-      product
+      product,
     });
-
   } catch (error) {
     console.error(error);
     return res.status(500).json({
       message: "❌ Failed to fetch products",
-      error: error.message
+      error: error.message,
     });
   }
 };
