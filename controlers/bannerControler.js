@@ -5,13 +5,7 @@ const { getBannersWithinRadius } = require("../utils/location");
 
 exports.banner = async (req, res) => {
   try {
-    let {
-      title,
-      type,
-      mainCategory,
-      subCategory,
-      status,
-    } = req.body;
+    let { title, type, mainCategory, subCategory, status } = req.body;
     const rawImagePath = req.files?.image?.[0]?.key || "";
     const image = rawImagePath ? `/${rawImagePath}` : "";
 
@@ -26,17 +20,23 @@ exports.banner = async (req, res) => {
     let foundCategory = null;
     let foundSubCategory = null;
 
-      if (!mainCategory)
-        return res.status(400).json({ message: "Main category is required" });
+    if (!mainCategory)
+      return res.status(400).json({ message: "Main category is required" });
 
-      foundCategory = await Category.findOne({ _id: mainCategory });
-      if (!foundCategory)
-        return res.status(204).json({ message: `Category ${mainCategory} not found` });
+    foundCategory = await Category.findOne({ _id: mainCategory });
+    if (!foundCategory)
+      return res
+        .status(204)
+        .json({ message: `Category ${mainCategory} not found` });
 
-      if (subCategory) 
-        foundSubCategory = foundCategory.subcat.find((sub) => sub._id.toString() === subCategory);
-        if (!foundSubCategory)
-          return res.status(204).json({ message: `SubCategory ${subCategory} not found` });
+    if (subCategory)
+      foundSubCategory = foundCategory.subcat.find(
+        (sub) => sub._id.toString() === subCategory
+      );
+    if (!foundSubCategory)
+      return res
+        .status(204)
+        .json({ message: `SubCategory ${subCategory} not found` });
 
     const newBanner = await Banner.create({
       image,
@@ -72,7 +72,7 @@ exports.banner = async (req, res) => {
 
 exports.getBanner = async (req, res) => {
   try {
-    const { type } = req.query;
+    const { type, categoryId } = req.query;
     const userId = req.user;
 
     const user = await User.findById(userId).lean();
@@ -95,6 +95,13 @@ exports.getBanner = async (req, res) => {
         });
       }
       filters.type = type;
+    }
+
+    if (categoryId) {
+      filters.$or = [
+        { "mainCategory._id": categoryId },
+        { "subCategory._id": categoryId },
+      ];
     }
 
     const allBanners = await Banner.find(filters)
@@ -159,19 +166,19 @@ exports.updateBannerStatus = async (req, res) => {
 
     // Handle city
     if (typeof city === "string") {
-     try {
-       city = JSON.parse(city);
-     } catch (err) {
-       console.log(err)
-       return res.status(400).json({ message: "Invalid city format" });
-     }
+      try {
+        city = JSON.parse(city);
+      } catch (err) {
+        console.log(err);
+        return res.status(400).json({ message: "Invalid city format" });
+      }
     }
-    
+
     let cityIds = Array.isArray(city) ? city : [city];
-    
+
     const cityDoc = await ZoneData.find({ _id: { $in: cityIds } });
     if (cityDoc) {
-      updateData.city = cityDoc.map(c => ({_id: c._id,name: c.city}));
+      updateData.city = cityDoc.map((c) => ({ _id: c._id, name: c.city }));
     }
 
     if (type2 === "NO") {
