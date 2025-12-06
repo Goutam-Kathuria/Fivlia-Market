@@ -51,7 +51,7 @@ exports.login = async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES_IN }
     );
 
-    return res.status(200).json({ message: "Login Successfully", token });
+    return res.status(200).json({ message: "Login Successfully", token, userId: user._id });
   } catch (error) {
     console.error("Error creating store:", err);
     return res

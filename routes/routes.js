@@ -16,7 +16,7 @@ const { banner, getBanner, getAllBanner, updateBannerStatus } = require("../cont
 const { saveLocation } = require("../controlers/locationControler");
 // ---------------- AUTH ROUTES ----------------
 const { register, login, getUsers, getProfile } = require("../controlers/authControler");
-const { addProduct, getProduct, updateProductStatus } = require("../controlers/productControler");
+const { addProduct, getProduct, updateProductStatus, editProduct } = require("../controlers/productControler");
 
 router.post("/register", register);
 router.post("/login", login);
@@ -49,6 +49,7 @@ router.patch("/toggleStatus/:catId/:subId", toggleStatus);
 router.post("/addProduct", upload,verifyToken, addProduct);
 router.get("/getProduct", getProduct);
 router.post("/update-product-status/:productId", updateProductStatus);
+router.post("/edit-product/:productId", editProduct);
 // ---------------- BANNER ROUTES ----------------
 // Add or Update BANNER
 router.post("/addBanner", upload, banner);
