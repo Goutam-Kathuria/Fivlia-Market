@@ -6,7 +6,6 @@ const productSchema = new mongoose.Schema({
   description: String,
   category: [{ type: mongoose.Schema.Types.ObjectId, ref: "Category" },],
   subCategory: [{ type: mongoose.Schema.Types.ObjectId },],
-  subSubCategory: [{ type: mongoose.Schema.Types.ObjectId }],
   status: { type: Boolean, default: true },
   price:Number,
   address:String,

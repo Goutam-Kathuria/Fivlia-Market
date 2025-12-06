@@ -8,7 +8,6 @@ exports.addProduct = async (req, res) => {
       description,
       category,
       subCategory,
-      subSubCategory,
       price,
       address,
     } = req.body;
@@ -16,14 +15,12 @@ exports.addProduct = async (req, res) => {
       `/${req.files?.MultipleImage?.[0]?.key}` || req.body.MultipleImage || "";
     category = category || null;
     subCategory = subCategory || null;
-    subSubCategory = subSubCategory || null;
     userId = userId || null;
     const newProduct = await products.create({
       name,
       description,
       category,
       subCategory,
-      subSubCategory,
       price,
       address,
       userId,
@@ -80,7 +77,6 @@ exports.getProduct = async (req, res) => {
       .find(filter)
       .populate("category")
       .populate("subCategory")
-      .populate("subSubCategory")
       .populate("userId")
       .sort({ createdAt: -1 });
 
@@ -173,7 +169,6 @@ exports.editProduct = async (req, res) => {
       address,
       category,
       subCategory,
-      subSubCategory,
     } = req.body;
 
     // Editable fields
@@ -184,7 +179,6 @@ exports.editProduct = async (req, res) => {
 
     if (category) product.category = category;
     if (subCategory) product.subCategory = subCategory;
-    if (subSubCategory) product.subSubCategory = subSubCategory;
 
     // Image handling
     if (req.files?.MultipleImage) {
