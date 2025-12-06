@@ -213,6 +213,28 @@ exports.repostProduct = async (req, res) => {
         .json({ message: "Only expired ads can be reposted." });
     }
 
+    const {
+      name,
+      description,
+      price,
+      address,
+      category,
+      subCategory,
+    } = req.body;
+
+    if (name) product.name = name;
+    if (description) product.description = description;
+    if (price) product.price = price;
+    if (address) product.address = address;
+
+    if (category) product.category = category;
+    if (subCategory) product.subCategory = subCategory;
+
+    // Image handling
+    if (req.files?.MultipleImage) {
+      product.image = req.files.MultipleImage.map((f) => `/${f.key}`);
+    }
+
     // Reset expiry timer
     const expiry = new Date();
     expiry.setDate(expiry.getDate() + product.expiryDays);
