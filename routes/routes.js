@@ -16,7 +16,7 @@ const { banner, getBanner, getAllBanner, updateBannerStatus } = require("../cont
 const { saveLocation } = require("../controlers/locationControler");
 // ---------------- AUTH ROUTES ----------------
 const { register, login, getUsers, getProfile } = require("../controlers/authControler");
-const { addProduct, getProduct, updateProductStatus, editProduct, repostProduct } = require("../controlers/productControler");
+const { addProduct, getProduct, updateProductStatus, editProduct, repostProduct, getProductForApprovals } = require("../controlers/productControler");
 
 router.post("/register", register);
 router.post("/login", login);
@@ -51,6 +51,7 @@ router.get("/getProduct", getProduct);
 router.post("/update-product-status/:productId", updateProductStatus);
 router.post("/edit-product/:productId", upload, editProduct);
 router.post("/repost-product/:productId", upload, repostProduct);
+router.get("/get-product-for-approvals", getProductForApprovals);
 // ---------------- BANNER ROUTES ----------------
 // Add or Update BANNER
 router.post("/addBanner", upload, banner);

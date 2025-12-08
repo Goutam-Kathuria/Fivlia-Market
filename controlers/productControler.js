@@ -107,6 +107,19 @@ exports.getProduct = async (req, res) => {
   }
 };
 
+exports.getProductForApprovals = async (req, res) => {
+  try{
+  const Products = await products.find({productStatus:'pending'}).populate("userId", "name email mobileNumber image latitude longitude");
+
+  return res.status(200).json({message:"Products fetched successfully", Products})
+  }catch(error){
+    console.error("❌ Error fetching products:", error);
+    return res.status(500).json({
+      message: "An error occurred while fetching banners.",
+      error: error.message,
+    });
+  }
+}
 
 exports.updateProductStatus = async (req, res) => {
   try {
