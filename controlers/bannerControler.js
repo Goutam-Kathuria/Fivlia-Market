@@ -5,7 +5,8 @@ const { getBannersWithinRadius } = require("../utils/location");
 
 exports.banner = async (req, res) => {
   try {
-    let { title, type, mainCategory, subCategory, status } = req.body;
+    let { title, type, mainCategory, subCategory, status, expiryDays } =
+      req.body;
     const rawImagePath = req.files?.image?.[0]?.key || "";
     const image = rawImagePath ? `/${rawImagePath}` : "";
 
@@ -17,30 +18,33 @@ exports.banner = async (req, res) => {
         .json({ message: 'Invalid banner type. Must be "normal" or "offer".' });
     }
 
-    let foundCategory = null;
-    let foundSubCategory = null;
-
     if (!mainCategory)
       return res.status(400).json({ message: "Main category is required" });
 
     foundCategory = await Category.findOne({ _id: mainCategory });
     if (!foundCategory)
       return res
-        .status(204)
+        .status(404)
         .json({ message: `Category ${mainCategory} not found` });
 
-    if (subCategory)
+    const hasSubCategory = subCategory && subCategory.trim() !== "";
+    let foundSubCategory = null;
+
+    if (hasSubCategory) {
       foundSubCategory = foundCategory.subcat.find(
         (sub) => sub._id.toString() === subCategory
       );
-    if (!foundSubCategory)
-      return res
-        .status(204)
-        .json({ message: `SubCategory ${subCategory} not found` });
+
+      if (!foundSubCategory)
+        return res
+          .status(404)
+          .json({ message: `SubCategory ${subCategory} not found` });
+    }
 
     const newBanner = await Banner.create({
       image,
       title,
+      expiryDays,
       type: bannerType,
 
       mainCategory: foundCategory

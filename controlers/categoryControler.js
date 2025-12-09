@@ -4,7 +4,7 @@ const Category = require("../modals/category");
 exports.saveCategory = async (req, res) => {
   try {
     const { id, name, description, status } = req.body;
-    let { attribute, filter } = req.body;
+    let { attribute, city, filter } = req.body;
 
     // Parse array fields
     if (typeof attribute === "string") {
@@ -14,6 +14,10 @@ exports.saveCategory = async (req, res) => {
       try { filter = JSON.parse(filter); } catch { filter = []; }
     }
 
+    if (typeof city === "string") {
+      try { city = JSON.parse(city); } catch { city = []; }
+    }
+
     const image = `/${req.files?.image?.[0]?.key}` || req.body.image || "";
 
     let category;
@@ -21,7 +25,7 @@ exports.saveCategory = async (req, res) => {
       // Update
       category = await Category.findByIdAndUpdate(
         id,
-        { name, description, attribute, filter, status, image },
+        { name, description, attribute, filter, city, status, image },
         { new: true }
       );
       if (!category)
@@ -32,6 +36,7 @@ exports.saveCategory = async (req, res) => {
         name,
         description,
         attribute,
+        city,
         filter,
         image,
       });

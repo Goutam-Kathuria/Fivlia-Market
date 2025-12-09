@@ -13,7 +13,7 @@ const {
 } = require("../controlers/categoryControler");
 const { banner, getBanner, getAllBanner, updateBannerStatus } = require("../controlers/bannerControler");
 
-const { saveLocation } = require("../controlers/locationControler");
+const { saveLocation, getCity } = require("../controlers/locationControler");
 // ---------------- AUTH ROUTES ----------------
 const { register, login, getUsers, getProfile } = require("../controlers/authControler");
 const { addProduct, getProduct, updateProductStatus, editProduct, repostProduct, getProductForApprovals } = require("../controlers/productControler");
@@ -22,7 +22,7 @@ router.post("/register", register);
 router.post("/login", login);
 
 router.post("/save-location", verifyToken, saveLocation);
-
+router.get("/get-city", getCity);
 router.get("/getUsers", getUsers);
 router.get("/getProfile", verifyToken, getProfile);
 // ---------------- CATEGORY ROUTES ----------------
