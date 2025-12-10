@@ -137,7 +137,7 @@ exports.saveSubEntity = async (req, res) => {
   try {
     const { catId } = req.params;
     const { subId } = req.query;
-    const { name, description, attribute, city, commison, status } = req.body;
+    let { name, description, attribute, city, commison, status } = req.body;
     const image = `/${req.files?.image?.[0]?.key}` || req.body.image || "";
 
     if (typeof city === "string") {
