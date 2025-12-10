@@ -148,6 +148,14 @@ exports.saveSubEntity = async (req, res) => {
       }
     }
 
+    if (typeof attribute === "string") {
+      try {
+        attribute = JSON.parse(attribute);
+      } catch {
+        attribute = [];
+      }
+    }
+
     const category = await Category.findById(catId);
     if (!category)
       return res.status(404).json({ message: "❌ Category not found" });

@@ -5,23 +5,15 @@ const { getBannersWithinRadius } = require("../utils/location");
 
 exports.banner = async (req, res) => {
   try {
-    let { title, type, mainCategory, subCategory, status, expiryDays } =
-      req.body;
+    const userId = req.user
+    let { title, mainCategory, subCategory, cityId, status } = req.body;
     const rawImagePath = req.files?.image?.[0]?.key || "";
     const image = rawImagePath ? `/${rawImagePath}` : "";
-
-    const validTypes = ["normal", "offer"];
-    const bannerType = validTypes.includes(type) ? type : "normal";
-    if (!bannerType) {
-      return res
-        .status(402)
-        .json({ message: 'Invalid banner type. Must be "normal" or "offer".' });
-    }
 
     if (!mainCategory)
       return res.status(400).json({ message: "Main category is required" });
 
-    foundCategory = await Category.findOne({ _id: mainCategory });
+    let foundCategory = await Category.findOne({ _id: mainCategory });
     if (!foundCategory)
       return res
         .status(404)
@@ -40,13 +32,12 @@ exports.banner = async (req, res) => {
           .status(404)
           .json({ message: `SubCategory ${subCategory} not found` });
     }
-
+console.log('cityId',cityId, 'userId', userId)
     const newBanner = await Banner.create({
       image,
       title,
-      expiryDays,
-      type: bannerType,
-
+      userId,
+      cityId,
       mainCategory: foundCategory
         ? {
             _id: foundCategory._id,
@@ -76,8 +67,19 @@ exports.banner = async (req, res) => {
 
 exports.getBanner = async (req, res) => {
   try {
-    const { type, categoryId } = req.query;
+    const { categoryId, myAds } = req.query;
     const userId = req.user;
+
+    if(myAds !== undefined){
+      const myBanners = await Banner.find({userId})
+      .lean()
+      .sort({ createdAt: -1 });
+    return res.status(200).json({
+      message: "Banners fetched successfully.",
+      count: myBanners.length,
+      data: myBanners,
+    });
+    }
 
     const user = await User.findById(userId).lean();
 
@@ -91,16 +93,6 @@ exports.getBanner = async (req, res) => {
 
     // 🔎 Apply base filters
     const filters = { status: true };
-    if (type) {
-      const validTypes = ["offer", "normal"];
-      if (!validTypes.includes(type)) {
-        return res.status(400).json({
-          message: 'Invalid banner type. Must be "offer" or "normal".',
-        });
-      }
-      filters.type = type;
-    }
-
     if (categoryId) {
       filters.$or = [
         { "mainCategory._id": categoryId },
@@ -108,9 +100,10 @@ exports.getBanner = async (req, res) => {
       ];
     }
 
-    const allBanners = await Banner.find(filters)
+    const allBanners = await Banner.find(filters).populate("cityId", "city latitude longitude")
       .lean()
       .sort({ createdAt: -1 });
+      console.log(allBanners)
     const matchedBanners = await getBannersWithinRadius(
       userLat,
       userLng,

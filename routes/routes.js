@@ -54,7 +54,7 @@ router.post("/repost-product/:productId", upload, repostProduct);
 router.get("/get-product-for-approvals", getProductForApprovals);
 // ---------------- BANNER ROUTES ----------------
 // Add or Update BANNER
-router.post("/addBanner", upload, banner);
+router.post("/addBanner",verifyToken, upload, banner);
 router.put("/update-banner-status/:id", upload, updateBannerStatus); 
 
 router.get("/getBanner",verifyToken, getBanner);
