@@ -91,7 +91,8 @@ exports.getCategories = async (req, res) => {
 // ---------------- DELETE ANY LEVEL (CAT / SUB / SUB-SUB) ----------------
 exports.deleteEntity = async (req, res) => {
   try {
-    const { catId, subId } = req.params;
+    const { catId } = req.params;
+    const { subId } = req.query;
     if (!catId)
       return res.status(400).json({ message: "❌ Category ID is required" });
 
@@ -122,8 +123,9 @@ exports.deleteEntity = async (req, res) => {
 // ---------------- ADD OR UPDATE SUB / SUB–SUB CATEGORY ----------------
 exports.saveSubEntity = async (req, res) => {
   try {
-    const { catId, subId } = req.params;
-    const { name, description, attribute, commison, status } =
+    const { catId } = req.params;
+    const { subId } = req.query;
+    const { name, description, attribute, city, commison, status } =
       req.body;
     const image = `/${req.files?.image?.[0]?.key}` || req.body.image || "";
 
@@ -140,6 +142,7 @@ exports.saveSubEntity = async (req, res) => {
           description,
           attribute,
           commison,
+          city,
           status,
           image,
         });
@@ -157,6 +160,7 @@ exports.saveSubEntity = async (req, res) => {
       description,
       image,
       attribute,
+      city,
       commison,
     });
     await category.save();
@@ -175,8 +179,8 @@ exports.saveSubEntity = async (req, res) => {
 // ---------------- TOGGLE STATUS (GENERIC) ----------------
 exports.toggleStatus = async (req, res) => {
   try {
-    const { catId, subId } = req.params;
-
+    const { catId } = req.params;
+    const { subId } = req.query;
     const category = await Category.findById(catId);
     if (!category)
       return res.status(404).json({ message: "❌ Category not found" });

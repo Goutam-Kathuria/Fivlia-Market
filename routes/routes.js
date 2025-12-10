@@ -35,15 +35,15 @@ router.get("/getCategories", getCategories);
 
 // ---------------- SUB CATEGORY ROUTES ----------------
 // Add or Update Subcategory
-router.post("/saveSubEntity/:catId/:subId", upload, saveSubEntity);
+router.post("/saveSubEntity/:catId", upload, saveSubEntity);
 
 // ---------------- DELETE ROUTE ----------------
 // Delete Category / Subcategory (based on params)
-router.delete("/deleteEntity/:catId/:subId", deleteEntity);
+router.delete("/deleteEntity/:catId", deleteEntity);
 
 // ---------------- STATUS TOGGLE ----------------
 // Toggle Category/Sub Status
-router.patch("/toggleStatus/:catId/:subId", toggleStatus);
+router.patch("/toggleStatus/:catId", toggleStatus);
 
 // ---------------- PRODUCT ROUTES ----------------
 router.post("/addProduct", upload,verifyToken, addProduct);
