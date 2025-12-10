@@ -8,14 +8,26 @@ exports.saveCategory = async (req, res) => {
 
     // Parse array fields
     if (typeof attribute === "string") {
-      try { attribute = JSON.parse(attribute); } catch { attribute = []; }
+      try {
+        attribute = JSON.parse(attribute);
+      } catch {
+        attribute = [];
+      }
     }
     if (typeof filter === "string") {
-      try { filter = JSON.parse(filter); } catch { filter = []; }
+      try {
+        filter = JSON.parse(filter);
+      } catch {
+        filter = [];
+      }
     }
 
     if (typeof city === "string") {
-      try { city = JSON.parse(city); } catch { city = []; }
+      try {
+        city = JSON.parse(city);
+      } catch {
+        city = [];
+      }
     }
 
     const image = `/${req.files?.image?.[0]?.key}` || req.body.image || "";
@@ -125,9 +137,16 @@ exports.saveSubEntity = async (req, res) => {
   try {
     const { catId } = req.params;
     const { subId } = req.query;
-    const { name, description, attribute, city, commison, status } =
-      req.body;
+    const { name, description, attribute, city, commison, status } = req.body;
     const image = `/${req.files?.image?.[0]?.key}` || req.body.image || "";
+
+    if (typeof city === "string") {
+      try {
+        city = JSON.parse(city);
+      } catch {
+        city = [];
+      }
+    }
 
     const category = await Category.findById(catId);
     if (!category)
@@ -196,9 +215,7 @@ exports.toggleStatus = async (req, res) => {
     await category.save();
 
     res.json({
-      message: `✅ ${
-        target.status ? "Activated" : "Deactivated"
-      } successfully`,
+      message: `✅ ${target.status ? "Activated" : "Deactivated"} successfully`,
       status: target.status,
     });
   } catch (err) {
