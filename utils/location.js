@@ -8,19 +8,19 @@ const getBannersWithinRadius = async (userLat, userLng, banners = []) => {
       return false;
     }
 
-     let bannerLat = banner.cityId.latitude;
-     let bannerLng = banner.cityId.longitude;
+    let bannerLat = banner.cityId.latitude;
+    let bannerLng = banner.cityId.longitude;
 
     const userCoord = { lat: userLat, lon: userLng };
     const bannerCoord = { lat: bannerLat, lon: bannerLng };
 
     // Distance returned in METERS → convert to KM
     const distanceKm = haversine(userCoord, bannerCoord) / 1000;
-
-    return distanceKm <= 50;
+    console.log(distanceKm);
+    return distanceKm <= 10;
   });
 };
 
 module.exports = {
-  getBannersWithinRadius
+  getBannersWithinRadius,
 };

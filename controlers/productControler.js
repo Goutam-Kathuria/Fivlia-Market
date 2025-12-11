@@ -1,16 +1,10 @@
 const products = require("../modals/product");
+const banner = require("../modals/banner");
 
 exports.addProduct = async (req, res) => {
   try {
     let userId = req.user;
-    let {
-      name,
-      description,
-      category,
-      subCategory,
-      price,
-      address,
-    } = req.body;
+    let { name, description, category, subCategory, price, address } = req.body;
     const image =
       `/${req.files?.MultipleImage?.[0]?.key}` || req.body.MultipleImage || "";
     category = category || null;
@@ -46,8 +40,7 @@ exports.getProduct = async (req, res) => {
     // If userId is present → user dashboard → show ALL their ads
     if (userId) {
       filter.userId = userId;
-    } 
-    else {
+    } else {
       // Public listing → only active products
       filter.productStatus = "active";
     }
@@ -97,7 +90,6 @@ exports.getProduct = async (req, res) => {
       page: usePagination ? Number(page) : null,
       totalPages: usePagination ? Math.ceil(total / limit) : null,
     });
-
   } catch (error) {
     console.error(error);
     return res.status(500).json({
@@ -108,18 +100,30 @@ exports.getProduct = async (req, res) => {
 };
 
 exports.getProductForApprovals = async (req, res) => {
-  try{
-  const Products = await products.find({productStatus:'pending'}).populate("userId", "name email mobileNumber image latitude longitude");
+  try {
+    const banners = await banner
+      .find({ aprroveStatus: "pending" })
+      .populate("userId", "name email mobileNumber image latitude longitude");
+    const Products = await products
+      .find({ productStatus: "pending" })
+      .populate("userId", "name email mobileNumber image latitude longitude");
 
-  return res.status(200).json({message:"Products fetched successfully", Products})
-  }catch(error){
+    const Approvals = {
+      banners: banners.map((item) => ({ ...item._doc, type: "banner" })),
+      products: Products.map((item) => ({ ...item._doc, type: "product" })),
+    };
+
+    return res
+      .status(200)
+      .json({ message: "Products fetched successfully", Approvals });
+  } catch (error) {
     console.error("❌ Error fetching products:", error);
     return res.status(500).json({
       message: "An error occurred while fetching banners.",
       error: error.message,
     });
   }
-}
+};
 
 exports.updateProductStatus = async (req, res) => {
   try {
@@ -175,14 +179,8 @@ exports.editProduct = async (req, res) => {
     //   return res.status(403).json({ message: "Not allowed" });
     // }
 
-    const {
-      name,
-      description,
-      price,
-      address,
-      category,
-      subCategory,
-    } = req.body;
+    const { name, description, price, address, category, subCategory } =
+      req.body;
 
     // Editable fields
     if (name) product.name = name;
@@ -226,14 +224,8 @@ exports.repostProduct = async (req, res) => {
         .json({ message: "Only expired ads can be reposted." });
     }
 
-    const {
-      name,
-      description,
-      price,
-      address,
-      category,
-      subCategory,
-    } = req.body;
+    const { name, description, price, address, category, subCategory } =
+      req.body;
 
     if (name) product.name = name;
     if (description) product.description = description;

@@ -14,7 +14,8 @@ const bannerSchema = new mongoose.Schema(
     },
     cityId: {type: mongoose.Schema.Types.ObjectId, ref: "locations"},
     userId: {type: mongoose.Schema.Types.ObjectId, ref: "User"},
-    status: { type: Boolean, dafault: true },
+    aprroveStatus:{type:String,default:'pending',enum:['pending','rejected','active', "expired"]},
+    status: { type: Boolean, dafault: false },
   },
   { timestamps: true }
 );

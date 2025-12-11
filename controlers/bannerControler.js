@@ -5,8 +5,8 @@ const { getBannersWithinRadius } = require("../utils/location");
 
 exports.banner = async (req, res) => {
   try {
-    const userId = req.user
-    let { title, mainCategory, subCategory, cityId, status } = req.body;
+    const userId = req.user;
+    let { title, mainCategory, subCategory, cityId, status, expiryDays } = req.body;
     const rawImagePath = req.files?.image?.[0]?.key || "";
     const image = rawImagePath ? `/${rawImagePath}` : "";
 
@@ -31,8 +31,8 @@ exports.banner = async (req, res) => {
         return res
           .status(404)
           .json({ message: `SubCategory ${subCategory} not found` });
-    }
-console.log('cityId',cityId, 'userId', userId)
+      }
+
     const newBanner = await Banner.create({
       image,
       title,
@@ -70,15 +70,15 @@ exports.getBanner = async (req, res) => {
     const { categoryId, myAds } = req.query;
     const userId = req.user;
 
-    if(myAds !== undefined){
-      const myBanners = await Banner.find({userId})
-      .lean()
-      .sort({ createdAt: -1 });
-    return res.status(200).json({
-      message: "Banners fetched successfully.",
-      count: myBanners.length,
-      data: myBanners,
-    });
+    if (myAds !== undefined) {
+      const myBanners = await Banner.find({ userId })
+        .lean()
+        .sort({ createdAt: -1 });
+      return res.status(200).json({
+        message: "Banners fetched successfully.",
+        count: myBanners.length,
+        data: myBanners,
+      });
     }
 
     const user = await User.findById(userId).lean();
@@ -100,16 +100,16 @@ exports.getBanner = async (req, res) => {
       ];
     }
 
-    const allBanners = await Banner.find(filters).populate("cityId", "city latitude longitude")
+    const allBanners = await Banner.find(filters)
+      .populate("cityId", "city latitude longitude")
       .lean()
       .sort({ createdAt: -1 });
-      console.log(allBanners)
     const matchedBanners = await getBannersWithinRadius(
       userLat,
       userLng,
       allBanners
     );
-
+    console.log(matchedBanners);
     if (!matchedBanners.length) {
       return res.status(200).json({
         message: "No banners found for your location.",
