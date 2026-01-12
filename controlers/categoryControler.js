@@ -30,11 +30,18 @@ exports.saveCategory = async (req, res) => {
       }
     }
 
-    const image = `/${req.files?.image?.[0]?.key}` || req.body.image || "";
+    let image;
 
+    if (req.files?.image?.length) {
+      image = `/${req.files?.image?.[0]?.key}` || req.body.image || "";
+    }
     let category;
     if (id) {
       // Update
+      if (image) {
+        updateData.image = image;
+      }
+
       category = await Category.findByIdAndUpdate(
         id,
         { name, description, attribute, filter, city, status, image },
