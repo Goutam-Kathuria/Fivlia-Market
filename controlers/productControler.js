@@ -1,10 +1,10 @@
 const products = require("../modals/product");
 const banner = require("../modals/banner");
-
+const {applyLocationFilter} = require("../utils/location")
 exports.addProduct = async (req, res) => {
   try {
     let userId = req.user;
-    let { name, description, category, subCategory, price, address } = req.body;
+    let { name, description, category, subCategory, latitude, longitude, price, address } = req.body;
     const image =
       `/${req.files?.MultipleImage?.[0]?.key}` || req.body.MultipleImage || "";
     category = category || null;
@@ -17,6 +17,8 @@ exports.addProduct = async (req, res) => {
       subCategory,
       price,
       address,
+      latitude,
+      longitude,
       userId,
       image,
     });
@@ -37,21 +39,40 @@ exports.getProduct = async (req, res) => {
 
     let filter = {};
 
-    // If userId is present → user dashboard → show ALL their ads
+    // =========================
+    // PUBLIC / USER (userId PRESENT)
+    // =========================
     if (userId) {
-      filter.userId = userId;
-    } else {
-      // Public listing → only active products
       filter.productStatus = "active";
-    }
-
-    if (categoryId) filter.category = categoryId;
-
-    // Only hide expired products in PUBLIC LISTING
-    if (!userId) {
       filter.expiresAt = { $gt: new Date() };
+
+      // 🔥 LOCATION FILTER (PUBLIC / USER ONLY)
+      const userLat = req.user?.latitude;
+      const userLng = req.user?.longitude;
+
+      if (userLat && userLng) {
+        applyLocationFilter(filter, userLat, userLng, 20);
+      }
     }
 
+    // =========================
+    // ADMIN (userId NOT PRESENT)
+    // =========================
+    if (!userId) {
+      // ❌ hide pending & rejected
+      filter.productStatus = { $in: ["active", "sold", "expired"] };
+    }
+
+    // =========================
+    // CATEGORY
+    // =========================
+    if (categoryId) {
+      filter.category = categoryId;
+    }
+
+    // =========================
+    // SEARCH
+    // =========================
     if (search) {
       filter.$or = [
         { name: { $regex: search, $options: "i" } },
@@ -60,6 +81,9 @@ exports.getProduct = async (req, res) => {
       ];
     }
 
+    // =========================
+    // PAGINATION (ADMIN ONLY)
+    // =========================
     let usePagination = false;
 
     if (!userId && !categoryId && !search) {
@@ -77,8 +101,9 @@ exports.getProduct = async (req, res) => {
 
     if (usePagination) {
       total = await products.countDocuments(filter);
-      const skip = (page - 1) * limit;
-      query = query.skip(skip).limit(Number(limit));
+      query = query
+        .skip((page - 1) * limit)
+        .limit(Number(limit));
     }
 
     const product = await query;
