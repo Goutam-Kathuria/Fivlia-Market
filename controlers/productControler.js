@@ -48,9 +48,9 @@ exports.getProduct = async (req, res) => {
     console.log(req.query);
     let filter = {};
 
-    const isAdmin = !userId && !categoryId && !search;
-    const isUserOwnListing = userId && !categoryId && !search;
-    const isCategoryListing = userId && categoryId;
+    const isAdmin = !userId && !category && !search;
+    const isUserOwnListing = userId && !category && !search;
+    const isCategoryListing = userId && category;
     const isSearchListing = userId && search;
 
     // =========================
@@ -75,7 +75,7 @@ exports.getProduct = async (req, res) => {
     if (isCategoryListing) {
       filter.productStatus = "active";
       filter.expiresAt = { $gt: new Date() };
-      filter.$or = [{ category: categoryId }, { subCategory: categoryId }];
+      filter.$or = [{ category: category }, { subCategory: category }];
 
       const userLat = req.user?.latitude;
       const userLng = req.user?.longitude;
