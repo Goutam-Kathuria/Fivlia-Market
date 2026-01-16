@@ -1,10 +1,19 @@
 const products = require("../modals/product");
 const banner = require("../modals/banner");
-const {applyLocationFilter} = require("../utils/location")
+const { applyLocationFilter } = require("../utils/location");
 exports.addProduct = async (req, res) => {
   try {
     let userId = req.user;
-    let { name, description, category, subCategory, latitude, longitude, price, address } = req.body;
+    let {
+      name,
+      description,
+      category,
+      subCategory,
+      latitude,
+      longitude,
+      price,
+      address,
+    } = req.body;
     const image =
       `/${req.files?.MultipleImage?.[0]?.key}` || req.body.MultipleImage || "";
     category = category || null;
@@ -39,14 +48,35 @@ exports.getProduct = async (req, res) => {
 
     let filter = {};
 
+    const isAdmin = !userId && !categoryId && !search;
+    const isUserOwnListing = userId && !categoryId && !search;
+    const isCategoryListing = userId && categoryId;
+    const isSearchListing = userId && search;
+
     // =========================
-    // PUBLIC / USER (userId PRESENT)
+    // 1️⃣ ADMIN
     // =========================
-    if (userId) {
+    if (isAdmin) {
+      filter.productStatus = { $in: ["active", "sold", "expired"] };
+    }
+
+    // =========================
+    // 2️⃣ USER – MY PRODUCTS
+    // =========================
+    if (isUserOwnListing) {
+      filter.userId = userId;
+      // no status filter
+      // no location filter
+    }
+
+    // =========================
+    // 3️⃣ USER – CATEGORY LISTING
+    // =========================
+    if (isCategoryListing) {
       filter.productStatus = "active";
       filter.expiresAt = { $gt: new Date() };
+      filter.category = categoryId;
 
-      // 🔥 LOCATION FILTER (PUBLIC / USER ONLY)
       const userLat = req.user?.latitude;
       const userLng = req.user?.longitude;
 
@@ -56,39 +86,30 @@ exports.getProduct = async (req, res) => {
     }
 
     // =========================
-    // ADMIN (userId NOT PRESENT)
+    // 4️⃣ USER – SEARCH LISTING
     // =========================
-    if (!userId) {
-      // ❌ hide pending & rejected
-      filter.productStatus = { $in: ["active", "sold", "expired"] };
-    }
+    if (isSearchListing) {
+      filter.productStatus = "active";
+      filter.expiresAt = { $gt: new Date() };
 
-    // =========================
-    // CATEGORY
-    // =========================
-    if (categoryId) {
-      filter.category = categoryId;
-    }
-
-    // =========================
-    // SEARCH
-    // =========================
-    if (search) {
       filter.$or = [
         { name: { $regex: search, $options: "i" } },
         { description: { $regex: search, $options: "i" } },
         { address: { $regex: search, $options: "i" } },
       ];
+
+      const userLat = req.user?.latitude;
+      const userLng = req.user?.longitude;
+
+      if (userLat && userLng) {
+        applyLocationFilter(filter, userLat, userLng, 20);
+      }
     }
 
     // =========================
     // PAGINATION (ADMIN ONLY)
     // =========================
-    let usePagination = false;
-
-    if (!userId && !categoryId && !search) {
-      usePagination = true;
-    }
+    let usePagination = isAdmin;
 
     let query = products
       .find(filter)
@@ -101,9 +122,7 @@ exports.getProduct = async (req, res) => {
 
     if (usePagination) {
       total = await products.countDocuments(filter);
-      query = query
-        .skip((page - 1) * limit)
-        .limit(Number(limit));
+      query = query.skip((page - 1) * limit).limit(Number(limit));
     }
 
     const product = await query;
@@ -283,5 +302,52 @@ exports.repostProduct = async (req, res) => {
     return res
       .status(500)
       .json({ message: "Failed to repost", error: err.message });
+  }
+};
+
+exports.getPublicListing = async (req, res) => {
+  try {
+    const { userId, latitude, longitude } = req.user;
+    const { page = 1, limit = 10 } = req.query;
+
+    if (!latitude || !longitude) {
+      return res.status(400).json({
+        success: false,
+        message: "User location not found",
+      });
+    }
+
+    let filter = {
+      productStatus: "active",
+      expiresAt: { $gt: new Date() },
+    };
+
+    // 📍 Apply location filter (20 KM)
+    applyLocationFilter(filter, latitude, longitude, 20);
+
+    const total = await products.countDocuments(filter);
+
+    const product = await products
+      .find(filter)
+      .populate("category")
+      .populate("subCategory")
+      .populate("userId")
+      .skip((page - 1) * limit)
+      .limit(Number(limit))
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      product,
+      total,
+      page: Number(page),
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "❌ Failed to fetch products",
+    });
   }
 };
