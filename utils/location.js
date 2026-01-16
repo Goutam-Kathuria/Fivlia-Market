@@ -22,18 +22,18 @@ const getBannersWithinRadius = async (userLat, userLng, banners = []) => {
 };
 
 function applyLocationFilter(filter, userLat, userLng, radiusKm = 20) {
+
   filter.location = {
-    $near: {
-      $geometry: {
-        type: "Point",
-        coordinates: [userLng, userLat], // lng first
-      },
-      $maxDistance: radiusKm * 1000, // km → meters
+    $geoWithin: {
+      $centerSphere: [
+        [userLng, userLat], // lng, lat
+        radiusKm / 6378.1, // km → radians
+      ],
     },
   };
 }
 
 module.exports = {
   getBannersWithinRadius,
-  applyLocationFilter
+  applyLocationFilter,
 };

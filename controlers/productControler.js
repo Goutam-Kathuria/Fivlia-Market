@@ -316,13 +316,13 @@ exports.repostProduct = async (req, res) => {
 
 exports.getPublicListing = async (req, res) => {
   try {
-    const { userId, latitude, longitude } = req.user;
+    const userId = req.user;
     const { page = 1, limit = 10 } = req.query;
 
-    if (!latitude || !longitude) {
+    if (!userId) {
       return res.status(400).json({
         success: false,
-        message: "User location not found",
+        message: "User not found",
       });
     }
 
@@ -331,8 +331,12 @@ exports.getPublicListing = async (req, res) => {
       expiresAt: { $gt: new Date() },
     };
 
+    const user = await Users.findById(userId).select("latitude longitude");
+    const userLat = user.latitude;
+    const userLng = user.longitude;
+
     // 📍 Apply location filter (20 KM)
-    applyLocationFilter(filter, latitude, longitude, 20);
+    applyLocationFilter(filter, userLat, userLng, 20);
 
     const total = await products.countDocuments(filter);
 
@@ -343,7 +347,6 @@ exports.getPublicListing = async (req, res) => {
       .populate("userId")
       .skip((page - 1) * limit)
       .limit(Number(limit))
-      .sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
