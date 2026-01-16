@@ -45,7 +45,7 @@ exports.addProduct = async (req, res) => {
 exports.getProduct = async (req, res) => {
   try {
     const { userId, categoryId, page = 1, limit = 10, search } = req.query;
-
+    console.log(req.query);
     let filter = {};
 
     const isAdmin = !userId && !categoryId && !search;
@@ -75,7 +75,7 @@ exports.getProduct = async (req, res) => {
     if (isCategoryListing) {
       filter.productStatus = "active";
       filter.expiresAt = { $gt: new Date() };
-      filter.category = categoryId;
+      filter.$or = [{ category: categoryId }, { subCategory: categoryId }];
 
       const userLat = req.user?.latitude;
       const userLng = req.user?.longitude;
@@ -92,18 +92,20 @@ exports.getProduct = async (req, res) => {
       filter.productStatus = "active";
       filter.expiresAt = { $gt: new Date() };
 
+      console.log("1", filter);
       filter.$or = [
         { name: { $regex: search, $options: "i" } },
         { description: { $regex: search, $options: "i" } },
         { address: { $regex: search, $options: "i" } },
       ];
-
+      console.log("2", filter);
       const userLat = req.user?.latitude;
       const userLng = req.user?.longitude;
 
       if (userLat && userLng) {
         applyLocationFilter(filter, userLat, userLng, 20);
       }
+      console.log("final", filter);
     }
 
     // =========================
@@ -126,7 +128,7 @@ exports.getProduct = async (req, res) => {
     }
 
     const product = await query;
-
+    console.log("last", product);
     return res.status(200).json({
       success: true,
       product,
