@@ -1,5 +1,7 @@
 const products = require("../modals/product");
 const banner = require("../modals/banner");
+const Users = require("../modals/user");
+
 const { applyLocationFilter } = require("../utils/location");
 exports.addProduct = async (req, res) => {
   try {
@@ -77,8 +79,10 @@ exports.getProduct = async (req, res) => {
       filter.expiresAt = { $gt: new Date() };
       filter.$or = [{ category: category }, { subCategory: category }];
 
-      const userLat = req.user?.latitude;
-      const userLng = req.user?.longitude;
+      const user = await Users.findById(userId).select("latitude longitude");
+
+      const userLat = user.latitude;
+      const userLng = user.latitude;
 
       if (userLat && userLng) {
         applyLocationFilter(filter, userLat, userLng, 20);
@@ -99,8 +103,11 @@ exports.getProduct = async (req, res) => {
         { address: { $regex: search, $options: "i" } },
       ];
       console.log("2", filter);
-      const userLat = req.user?.latitude;
-      const userLng = req.user?.longitude;
+
+      const user = await Users.findById(userId).select("latitude longitude");
+
+      const userLat = user.latitude;
+      const userLng = user.latitude;
 
       if (userLat && userLng) {
         applyLocationFilter(filter, userLat, userLng, 20);
