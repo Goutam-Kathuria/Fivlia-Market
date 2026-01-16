@@ -44,7 +44,7 @@ exports.addProduct = async (req, res) => {
 
 exports.getProduct = async (req, res) => {
   try {
-    const { userId, categoryId, page = 1, limit = 10, search } = req.query;
+    const { userId, category, page = 1, limit = 10, search } = req.query;
     console.log(req.query);
     let filter = {};
 
