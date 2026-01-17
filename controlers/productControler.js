@@ -51,7 +51,7 @@ exports.getProduct = async (req, res) => {
     let filter = {};
 
     const isAdmin = !userId && !category && !search;
-    const isUserOwnListing = userId && !category && !search;
+    const isUserOwnListing = userId && !category && (search === undefined || search === null);
     const isCategoryListing = userId && category;
     const isSearchListing = userId && typeof search === "string" && search.trim() !== "";
     
