@@ -82,7 +82,7 @@ exports.getProduct = async (req, res) => {
       const user = await Users.findById(userId).select("latitude longitude");
 
       const userLat = user.latitude;
-      const userLng = user.latitude;
+      const userLng = user.longitude;
 
       if (userLat && userLng) {
         applyLocationFilter(filter, userLat, userLng, 20);
@@ -107,7 +107,7 @@ exports.getProduct = async (req, res) => {
       const user = await Users.findById(userId).select("latitude longitude");
 
       const userLat = user.latitude;
-      const userLng = user.latitude;
+      const userLng = user.longitude;
 
       if (userLat && userLng) {
         applyLocationFilter(filter, userLat, userLng, 20);
@@ -317,7 +317,7 @@ exports.repostProduct = async (req, res) => {
 exports.getPublicListing = async (req, res) => {
   try {
     const userId = req.user;
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit } = req.query;
 
     if (!userId) {
       return res.status(400).json({
