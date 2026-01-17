@@ -50,11 +50,18 @@ exports.getProduct = async (req, res) => {
     console.log(req.query);
     let filter = {};
 
-    const isAdmin = !userId && !category && !search;
-    const isUserOwnListing = userId && !category && (search === undefined || search === null);
+    const cleanSearch = typeof search === "string" ? search.trim() : undefined;
+
+    const isAdmin = !userId && !category && cleanSearch === undefined;
+
+    const isUserOwnListing = userId && !category && cleanSearch === undefined;
+
+    const isBrowseListing = userId && cleanSearch === "";
+
+    const isSearchListing = userId && cleanSearch && cleanSearch.length > 0;
+
     const isCategoryListing = userId && category;
-    const isSearchListing = userId && typeof search === "string" && search.trim() !== "";
-    
+
     // =========================
     // 1️⃣ ADMIN
     // =========================
@@ -69,6 +76,17 @@ exports.getProduct = async (req, res) => {
       filter.userId = userId;
       // no status filter
       // no location filter
+    }
+
+    if (isBrowseListing) {
+      filter.productStatus = "active";
+      filter.expiresAt = { $gt: new Date() };
+
+      const user = await Users.findById(userId).select("latitude longitude");
+
+      if (user?.latitude && user?.longitude) {
+        applyLocationFilter(filter, user.latitude, user.longitude, 20);
+      }
     }
 
     // =========================
@@ -96,13 +114,11 @@ exports.getProduct = async (req, res) => {
       filter.productStatus = "active";
       filter.expiresAt = { $gt: new Date() };
 
-      console.log("1", filter);
       filter.$or = [
         { name: { $regex: search, $options: "i" } },
         { description: { $regex: search, $options: "i" } },
         { address: { $regex: search, $options: "i" } },
       ];
-      console.log("2", filter);
 
       const user = await Users.findById(userId).select("latitude longitude");
 
@@ -112,7 +128,6 @@ exports.getProduct = async (req, res) => {
       if (userLat && userLng) {
         applyLocationFilter(filter, userLat, userLng, 20);
       }
-      console.log("final", filter);
     }
 
     // =========================
@@ -135,7 +150,6 @@ exports.getProduct = async (req, res) => {
     }
 
     const product = await query;
-    console.log("last", product);
     return res.status(200).json({
       success: true,
       product,
