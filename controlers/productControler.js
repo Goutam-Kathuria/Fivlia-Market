@@ -53,8 +53,8 @@ exports.getProduct = async (req, res) => {
     const isAdmin = !userId && !category && !search;
     const isUserOwnListing = userId && !category && !search;
     const isCategoryListing = userId && category;
-    const isSearchListing = userId && search;
-
+    const isSearchListing = userId && typeof search === "string" && search.trim() !== "";
+    
     // =========================
     // 1️⃣ ADMIN
     // =========================
@@ -346,7 +346,7 @@ exports.getPublicListing = async (req, res) => {
       .populate("subCategory")
       .populate("userId")
       .skip((page - 1) * limit)
-      .limit(Number(limit))
+      .limit(Number(limit));
 
     return res.status(200).json({
       success: true,
