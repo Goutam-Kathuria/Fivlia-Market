@@ -5,10 +5,10 @@ const jwt = require("jsonwebtoken");
 exports.register = async (req, res) => {
   try {
     const { name, password, mobileNumber, email, adharCardNumber } = req.body;
-    const hashedPassword = await bcrypt.hash(password, 10);
+
     const newUser = await User.create({
       name,
-      password: hashedPassword,
+      password,
       mobileNumber,
       email,
       adharCardNumber,
@@ -18,10 +18,10 @@ exports.register = async (req, res) => {
       .status(200)
       .json({ message: "User Created Successfully", newUser });
   } catch (error) {
-    console.error("Error creating user:", err);
+    console.error("Error creating user:", error);
     return res
       .status(500)
-      .json({ message: "Server error", error: err.message });
+      .json({ message: "Server error", error: error.message });
   }
 };
 exports.login = async (req, res) => {
