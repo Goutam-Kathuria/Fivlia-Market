@@ -52,10 +52,10 @@ exports.login = async (req, res) => {
 
     return res.status(200).json({ message: "Login Successfully", token, userId: user._id });
   } catch (error) {
-    console.error("Error creating store:", err);
+    console.error("Error creating store:", error);
     return res
       .status(500)
-      .json({ message: "Server error", error: err.message });
+      .json({ message: "Server error", error: error.message });
   }
 };
 
