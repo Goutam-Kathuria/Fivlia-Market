@@ -15,6 +15,7 @@ const categorySchema = new mongoose.Schema({
   image: String,
   description:String,
   city:[{cityId:String,price:Number}],
+  type:{type:String, enum :["service" , "products"], required:true},
   subcat: [subCategorySchema],
   attribute:[{type:String}],
   filter: [{_id: { type: mongoose.Schema.Types.ObjectId },Filter_name: { type: String },

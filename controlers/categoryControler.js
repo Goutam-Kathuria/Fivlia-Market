@@ -3,7 +3,7 @@ const Category = require("../modals/category");
 // ---------------- CREATE OR UPDATE CATEGORY ----------------
 exports.saveCategory = async (req, res) => {
   try {
-    const { id, name, description, status } = req.body;
+    const { id, name, description, type, status } = req.body;
     let { attribute, city, filter } = req.body;
 
     // Parse array fields
@@ -45,7 +45,7 @@ exports.saveCategory = async (req, res) => {
       category = await Category.findByIdAndUpdate(
         id,
         { name, description, attribute, filter, city, status, image },
-        { new: true }
+        { new: true },
       );
       if (!category)
         return res.status(404).json({ message: "❌ Category not found" });
@@ -57,6 +57,7 @@ exports.saveCategory = async (req, res) => {
         attribute,
         city,
         filter,
+        type,
         image,
       });
     }
@@ -79,7 +80,7 @@ exports.saveCategory = async (req, res) => {
 // (UNCHANGED RESPONSE FORMAT)
 exports.getCategories = async (req, res) => {
   try {
-    const { id } = req.query;
+    const { id, type } = req.query;
 
     if (id) {
       const category = await Category.findById(id);
@@ -91,8 +92,13 @@ exports.getCategories = async (req, res) => {
         category,
       });
     }
+    let filter = {};
 
-    const categories = await Category.find();
+    if (type) {
+      filter.type = type;
+    }
+
+    const categories = await Category.find(filter);
     res.status(200).json({
       message: "✅ All categories fetched successfully",
       count: categories.length,
