@@ -31,10 +31,11 @@ exports.saveCategory = async (req, res) => {
     }
 
     let image;
-
-    if (req.files?.image?.length) {
+console.log(req.files?.image)
+    if (req.files?.image) {
       image = `/${req.files?.image?.[0]?.key}` || req.body.image || "";
     }
+
     let category;
     if (id) {
       // Update
@@ -151,8 +152,10 @@ exports.saveSubEntity = async (req, res) => {
     const { catId } = req.params;
     const { subId } = req.query;
     let { name, description, attribute, city, commison, status } = req.body;
-    const image = `/${req.files?.image?.[0]?.key}` || req.body.image || "";
+        console.log(req.files?.image)
 
+    const image = `/${req.files?.image?.[0]?.key}` || req.body.image || "";
+    console.log(image)
     if (typeof city === "string") {
       try {
         city = JSON.parse(city);

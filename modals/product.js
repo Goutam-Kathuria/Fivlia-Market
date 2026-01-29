@@ -11,11 +11,13 @@ const productSchema = new mongoose.Schema(
     price: Number,
     address: String,
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    productType:String,
     productStatus: {
       type: String,
       default: "pending",
       enum: ["pending", "rejected", "active", "sold", "expired"],
     },
+    rating:{type:Number, default:0},
     latitude: Number,
     longitude: Number,
     location: {
@@ -31,11 +33,10 @@ const productSchema = new mongoose.Schema(
     expiresAt: { type: Date },
     expiryDays: { type: Number, default: 30 },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 productSchema.pre("save", function (next) {
-
   if (this.latitude && this.longitude) {
     this.location = {
       type: "Point",

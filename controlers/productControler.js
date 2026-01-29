@@ -15,6 +15,7 @@ exports.addProduct = async (req, res) => {
       longitude,
       price,
       address,
+      productType,
     } = req.body;
     const image =
       `/${req.files?.MultipleImage?.[0]?.key}` || req.body.MultipleImage || "";
@@ -28,6 +29,7 @@ exports.addProduct = async (req, res) => {
       subCategory,
       price,
       address,
+      productType,
       latitude,
       longitude,
       userId,

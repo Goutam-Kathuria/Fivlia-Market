@@ -14,6 +14,8 @@ const {
 const { banner, getBanner, getAllBanner, updateBannerStatus } = require("../controlers/bannerControler");
 
 const { saveLocation, getCity } = require("../controlers/locationControler");
+const { adminSetting, getAdminSetting } = require("../controlers/adminControler");
+
 // ---------------- AUTH ROUTES ----------------
 const { register, login, getUsers, getProfile } = require("../controlers/authControler");
 const { addProduct, getProduct, getPublicListing, updateProductStatus, editProduct, repostProduct, getProductForApprovals } = require("../controlers/productControler");
@@ -21,6 +23,7 @@ const { addProduct, getProduct, getPublicListing, updateProductStatus, editProdu
 router.post("/register", register);
 router.post("/login", login);
 
+router.post("/admin/update-setting", adminSetting);
 router.post("/save-location", verifyToken, saveLocation);
 router.get("/get-city", getCity);
 router.get("/getUsers", getUsers);
@@ -60,5 +63,7 @@ router.put("/update-banner-status/:id", upload, updateBannerStatus);
 
 router.get("/getBanner",verifyToken, getBanner);
 router.get("/get-all-banner", getAllBanner);
+
+router.get("/admin/get-setting", getAdminSetting);
 
 module.exports = router;
