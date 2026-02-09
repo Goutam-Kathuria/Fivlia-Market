@@ -24,9 +24,10 @@ exports.register = async (req, res) => {
       .json({ message: "Server error", error: error.message });
   }
 };
+
 exports.login = async (req, res) => {
   try {
-    const { mobileNumber, email, password } = req.body;
+    const { mobileNumber, email, fcmToken, password } = req.body;
 
     if (!mobileNumber || !password) {
       return res
@@ -43,14 +44,26 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
+    const isValidFcmToken =
+      typeof fcmToken === "string" &&
+      fcmToken.trim().length > 0 &&
+      fcmToken !== "null" &&
+      fcmToken !== "undefined";
+
+    if (isValidFcmToken) {
+      user.fcmToken = fcmToken.trim();
+      await user.save();
+    }
+
     // Generate JWT token
     const token = jwt.sign(
       { id: user._id, mobileNumber: user.mobileNumber },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
     );
 
-    return res.status(200).json({ message: "Login Successfully", token, userId: user._id });
+    return res
+      .status(200)
+      .json({ message: "Login Successfully", token, userId: user._id });
   } catch (error) {
     console.error("Error creating store:", error);
     return res

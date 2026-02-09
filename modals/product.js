@@ -17,7 +17,9 @@ const productSchema = new mongoose.Schema(
       default: "pending",
       enum: ["pending", "rejected", "active", "sold", "expired"],
     },
-    rating:{type:Number, default:0},
+    rating: { type: Number, default: 0 }, // average rating
+    ratingCount: { type: Number, default: 0 },
+    ratingSum: { type: Number, default: 0 },
     latitude: Number,
     longitude: Number,
     location: {

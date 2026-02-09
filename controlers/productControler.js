@@ -1,8 +1,24 @@
 const products = require("../modals/product");
 const banner = require("../modals/banner");
 const Users = require("../modals/user");
+const Rating = require("../modals/rating");
+const { applyLocationFilter, getDistanceKm } = require("../utils/location");
 
-const { applyLocationFilter } = require("../utils/location");
+const addDistanceKm = (items, userLat, userLng) => {
+  if (!userLat || !userLng) return items;
+  return items.map((item) => {
+    const obj = item.toObject ? item.toObject() : item;
+    if (obj.latitude && obj.longitude) {
+      obj.distanceKm = Number(
+        getDistanceKm(userLat, userLng, obj.latitude, obj.longitude).toFixed(2),
+      );
+    } else {
+      obj.distanceKm = null;
+    }
+    return obj;
+  });
+};
+
 exports.addProduct = async (req, res) => {
   try {
     let userId = req.user;
@@ -80,6 +96,9 @@ exports.getProduct = async (req, res) => {
       // no location filter
     }
 
+    let userLat;
+    let userLng;
+
     if (isBrowseListing) {
       filter.productStatus = "active";
       filter.expiresAt = { $gt: new Date() };
@@ -87,7 +106,9 @@ exports.getProduct = async (req, res) => {
       const user = await Users.findById(userId).select("latitude longitude");
 
       if (user?.latitude && user?.longitude) {
-        applyLocationFilter(filter, user.latitude, user.longitude, 20);
+        userLat = user.latitude;
+        userLng = user.longitude;
+        applyLocationFilter(filter, userLat, userLng, 20);
       }
     }
 
@@ -101,8 +122,8 @@ exports.getProduct = async (req, res) => {
 
       const user = await Users.findById(userId).select("latitude longitude");
 
-      const userLat = user.latitude;
-      const userLng = user.longitude;
+      userLat = user.latitude;
+      userLng = user.longitude;
 
       if (userLat && userLng) {
         applyLocationFilter(filter, userLat, userLng, 20);
@@ -124,8 +145,8 @@ exports.getProduct = async (req, res) => {
 
       const user = await Users.findById(userId).select("latitude longitude");
 
-      const userLat = user.latitude;
-      const userLng = user.longitude;
+      userLat = user.latitude;
+      userLng = user.longitude;
 
       if (userLat && userLng) {
         applyLocationFilter(filter, userLat, userLng, 20);
@@ -139,6 +160,7 @@ exports.getProduct = async (req, res) => {
 
     let query = products
       .find(filter)
+      .select("-ratingSum")
       .populate("category")
       .populate("subCategory")
       .populate("userId")
@@ -151,7 +173,9 @@ exports.getProduct = async (req, res) => {
       query = query.skip((page - 1) * limit).limit(Number(limit));
     }
 
-    const product = await query;
+    const productRaw = await query;
+    const product = addDistanceKm(productRaw, userLat, userLng);
+
     return res.status(200).json({
       success: true,
       product,
@@ -356,13 +380,16 @@ exports.getPublicListing = async (req, res) => {
 
     const total = await products.countDocuments(filter);
 
-    const product = await products
+    const productRaw = await products
       .find(filter)
+      .select("-ratingSum")
       .populate("category")
       .populate("subCategory")
       .populate("userId")
       .skip((page - 1) * limit)
       .limit(Number(limit));
+
+    const product = addDistanceKm(productRaw, userLat, userLng);
 
     return res.status(200).json({
       success: true,
@@ -376,6 +403,86 @@ exports.getPublicListing = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "❌ Failed to fetch products",
+    });
+  }
+};
+
+exports.rateProduct = async (req, res) => {
+  try {
+    const userId = req.user;
+    const { productId } = req.params;
+    const { value, comment } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const ratingValue = Number(value);
+    if (!ratingValue || ratingValue < 1 || ratingValue > 5) {
+      return res.status(400).json({ message: "Rating must be between 1 and 5" });
+    }
+
+    const product = await products.findById(productId).select("_id");
+    if (!product) return res.status(404).json({ message: "Product not found" });
+
+    const existing = await Rating.findOne({ productId, userId }).select("value");
+
+    if (existing) {
+      await Rating.findOneAndUpdate(
+        { productId, userId },
+        { value: ratingValue, comment },
+      );
+
+      const delta = ratingValue - existing.value;
+      const updated = await products.findByIdAndUpdate(
+        productId,
+        { $inc: { ratingSum: delta } },
+        { new: true },
+      );
+
+      const avg =
+        updated && updated.ratingCount
+          ? updated.ratingSum / updated.ratingCount
+          : 0;
+
+      await products.findByIdAndUpdate(productId, {
+        rating: Number(avg.toFixed(2)),
+      });
+
+      return res.status(200).json({
+        message: "Rating updated",
+        rating: Number(avg.toFixed(2)),
+        ratingCount: updated ? updated.ratingCount : 0,
+      });
+    }
+
+    await Rating.create({ productId, userId, value: ratingValue, comment });
+
+    const updated = await products.findByIdAndUpdate(
+      productId,
+      { $inc: { ratingSum: ratingValue, ratingCount: 1 } },
+      { new: true },
+    );
+
+    const avg =
+      updated && updated.ratingCount
+        ? updated.ratingSum / updated.ratingCount
+        : 0;
+
+    await products.findByIdAndUpdate(productId, {
+      rating: Number(avg.toFixed(2)),
+    });
+
+    return res.status(200).json({
+      message: "Rating saved",
+      rating: Number(avg.toFixed(2)),
+      ratingCount: updated ? updated.ratingCount : 0,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "Failed to rate product",
+      error: error.message,
     });
   }
 };

@@ -5,6 +5,7 @@ const userSchema = new mongoose.Schema({
     mobileNumber:{type:String},
     email:{type:String},
     adharCardNumber:Number,
+    fcmToken:String,
     latitude:Number,
     longitude:Number
 },{timestamps:true})

@@ -14,11 +14,11 @@ const {
 const { banner, getBanner, getAllBanner, updateBannerStatus } = require("../controlers/bannerControler");
 
 const { saveLocation, getCity } = require("../controlers/locationControler");
-const { adminSetting, getAdminSetting } = require("../controlers/adminControler");
+const { adminSetting, getAdminSetting, createNotification, editNotification, getNotifications, sendNotification } = require("../controlers/adminControler");
 
 // ---------------- AUTH ROUTES ----------------
 const { register, login, getUsers, getProfile } = require("../controlers/authControler");
-const { addProduct, getProduct, getPublicListing, updateProductStatus, editProduct, repostProduct, getProductForApprovals } = require("../controlers/productControler");
+const { addProduct, getProduct, getPublicListing, updateProductStatus, editProduct, repostProduct, getProductForApprovals, rateProduct } = require("../controlers/productControler");
 
 router.post("/register", register);
 router.post("/login", login);
@@ -56,6 +56,7 @@ router.post("/update-product-status/:productId", updateProductStatus);
 router.post("/edit-product/:productId", upload, editProduct);
 router.post("/repost-product/:productId", upload, repostProduct);
 router.get("/get-product-for-approvals", getProductForApprovals);
+router.post("/rate-product/:productId", verifyToken, rateProduct);
 // ---------------- BANNER ROUTES ----------------
 // Add or Update BANNER
 router.post("/addBanner",verifyToken, upload, banner);
@@ -65,5 +66,10 @@ router.get("/getBanner",verifyToken, getBanner);
 router.get("/get-all-banner", getAllBanner);
 
 router.get("/admin/get-setting", getAdminSetting);
+
+router.post("/create-notification", upload, createNotification);
+router.post("/edit-notification/:id", upload, editNotification);
+router.get("/get-notification", getNotifications);
+router.post("/send-notification", sendNotification);
 
 module.exports = router;
