@@ -1,6 +1,7 @@
 .env
 package.json
 package-lock.json
+fivlia-market.json
 # Logs
 logs
 *.log
