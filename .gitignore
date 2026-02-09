@@ -1,7 +1,7 @@
 .env
 package.json
 package-lock.json
-fivlia-market.json
+utils/firebase/fivlia-market.json
 # Logs
 logs
 *.log
