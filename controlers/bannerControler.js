@@ -104,12 +104,13 @@ exports.getBanner = async (req, res) => {
       .populate("cityId", "city latitude longitude")
       .lean()
       .sort({ createdAt: -1 });
+
     const matchedBanners = await getBannersWithinRadius(
       userLat,
       userLng,
       allBanners
     );
-    console.log(matchedBanners);
+
     if (!matchedBanners.length) {
       return res.status(200).json({
         message: "No banners found for your location.",

@@ -16,7 +16,6 @@ const getBannersWithinRadius = async (userLat, userLng, banners = []) => {
 
     // Distance returned in METERS → convert to KM
     const distanceKm = haversine(userCoord, bannerCoord) / 1000;
-    console.log(distanceKm);
     return distanceKm <= 20;
   });
 };
