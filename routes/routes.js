@@ -11,7 +11,7 @@ const {
   deleteEntity,
   toggleStatus
 } = require("../controlers/categoryControler");
-const { banner, getBanner, getAllBanner, updateBannerStatus } = require("../controlers/bannerControler");
+const { banner, getBanner, getAllBanner, updateBannerStatus, updateBannerApproval } = require("../controlers/bannerControler");
 
 const { saveLocation, getCity } = require("../controlers/locationControler");
 const { adminSetting, getAdminSetting, createNotification, editNotification, getNotifications, sendNotification } = require("../controlers/adminControler");
@@ -61,6 +61,7 @@ router.post("/rate-product/:productId", verifyToken, rateProduct);
 // Add or Update BANNER
 router.post("/addBanner",verifyToken, upload, banner);
 router.put("/update-banner-status/:id", upload, updateBannerStatus); 
+router.post("/update-banner-approval/:id", updateBannerApproval);
 
 router.get("/getBanner",verifyToken, getBanner);
 router.get("/get-all-banner", getAllBanner);

@@ -38,6 +38,9 @@ exports.banner = async (req, res) => {
       title,
       userId,
       cityId,
+      aprroveStatus: "pending",
+      approvalReason: "",
+      status: false,
       mainCategory: foundCategory
         ? {
             _id: foundCategory._id,
@@ -52,7 +55,6 @@ exports.banner = async (req, res) => {
           }
         : null,
 
-      status,
     });
     return res
       .status(200)
@@ -92,7 +94,7 @@ exports.getBanner = async (req, res) => {
     const userLng = user.longitude;
 
     // 🔎 Apply base filters
-    const filters = { status: true };
+    const filters = { aprroveStatus: "active" };
     if (categoryId) {
       filters.$or = [
         { "mainCategory._id": categoryId },
@@ -250,6 +252,21 @@ exports.updateBannerStatus = async (req, res) => {
     // Handle zones
     if (zones) updateData.zones = zones;
 
+    const existingBanner = await Banner.findById(id).select("aprroveStatus");
+    if (!existingBanner)
+      return res.status(404).json({ message: "Banner not found" });
+
+    // If banner was asked to resubmit or rejected, any update resubmits it
+    if (
+      existingBanner.aprroveStatus === "resubmit" ||
+      existingBanner.aprroveStatus === "rejected"
+    ) {
+      updateData.aprroveStatus = "pending";
+      updateData.approvalReason = "";
+      updateData.status = false;
+      updateData.approvedAt = null;
+    }
+
     // Update document
     const updatedBanner = await Banner.updateOne(
       { _id: id },
@@ -276,4 +293,57 @@ exports.updateBannerStatus = async (req, res) => {
 exports.getAllBanner = async (req, res) => {
   const allBanner = await Banner.find().sort({ createdAt: -1 });
   res.json(allBanner);
+};
+
+exports.updateBannerApproval = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { aprroveStatus, approvalReason = "" } = req.body;
+
+    const valid = ["active", "rejected", "resubmit", "pending", "expired"];
+    if (!valid.includes(aprroveStatus)) {
+      return res.status(400).json({ message: "Invalid approval status" });
+    }
+
+    const updateData = { aprroveStatus };
+
+    if (aprroveStatus === "active") {
+      updateData.status = true;
+      updateData.approvalReason = "";
+      updateData.approvedAt = new Date();
+    }
+
+    if (aprroveStatus === "rejected" || aprroveStatus === "resubmit") {
+      if (!approvalReason || approvalReason.trim() === "") {
+        return res
+          .status(400)
+          .json({ message: "Approval reason is required" });
+      }
+      updateData.status = false;
+      updateData.approvalReason = approvalReason.trim();
+      updateData.approvedAt = null;
+    }
+
+    if (aprroveStatus === "pending") {
+      updateData.status = false;
+      updateData.approvalReason = "";
+      updateData.approvedAt = null;
+    }
+
+    const updated = await Banner.findByIdAndUpdate(id, updateData, {
+      new: true,
+    });
+    if (!updated) return res.status(404).json({ message: "Banner not found" });
+
+    return res.status(200).json({
+      message: "Banner approval status updated",
+      banner: updated,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      message: "Error updating banner approval status.",
+      error: err.message,
+    });
+  }
 };

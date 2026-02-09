@@ -14,8 +14,14 @@ const bannerSchema = new mongoose.Schema(
     },
     cityId: {type: mongoose.Schema.Types.ObjectId, ref: "locations"},
     userId: {type: mongoose.Schema.Types.ObjectId, ref: "User"},
-    aprroveStatus:{type:String,default:'pending',enum:['pending','rejected','active', "expired"]},
-    status: { type: Boolean, dafault: false },
+    aprroveStatus: {
+      type: String,
+      default: "pending",
+      enum: ["pending", "rejected", "active", "resubmit", "expired"],
+    },
+    approvalReason: { type: String, default: "" },
+    approvedAt: { type: Date },
+    status: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
