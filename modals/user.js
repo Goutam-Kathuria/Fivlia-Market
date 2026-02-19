@@ -7,6 +7,7 @@ const userSchema = new mongoose.Schema({
     adharCardNumber:Number,
     fcmToken:String,
     latitude:Number,
-    longitude:Number
+    longitude:Number,
+    image:String
 },{timestamps:true})
 module.exports=mongoose.model('User',userSchema)

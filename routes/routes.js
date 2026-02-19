@@ -11,19 +11,45 @@ const {
   deleteEntity,
   toggleStatus
 } = require("../controlers/categoryControler");
-const { banner, getBanner, getAllBanner, updateBannerStatus, updateBannerApproval } = require("../controlers/bannerControler");
+const {
+  banner,
+  getBanner,
+  getAllBanner,
+  updateBannerStatus,
+  updateBannerApproval,
+  addPlans,
+  getPlans,
+} = require("../controlers/bannerControler");
 
 const { saveLocation, getCity } = require("../controlers/locationControler");
-const { adminSetting, getAdminSetting, createNotification, editNotification, getNotifications, sendNotification } = require("../controlers/adminControler");
+const {
+  adminSetting,
+  getAdminSetting,
+  createNotification,
+  editNotification,
+  getNotifications,
+  sendNotification,
+  addAdminBanner,
+} = require("../controlers/adminControler");
 
 // ---------------- AUTH ROUTES ----------------
-const { register, login, getUsers, getProfile } = require("../controlers/authControler");
+const {
+  register,
+  login,
+  getUsers,
+  getProfile,
+  updateFcmToken,
+  editProfile,
+} = require("../controlers/authControler");
 const { addProduct, getProduct, getPublicListing, updateProductStatus, editProduct, repostProduct, getProductForApprovals, rateProduct } = require("../controlers/productControler");
 
 router.post("/register", register);
 router.post("/login", login);
+router.post("/update-fcm-token", verifyToken, updateFcmToken);
+router.post("/edit-profile", verifyToken, editProfile);
 
 router.post("/admin/update-setting", adminSetting);
+router.post("/admin/addBanner", upload, addAdminBanner);
 router.post("/save-location", verifyToken, saveLocation);
 router.get("/get-city", getCity);
 router.get("/getUsers", getUsers);
@@ -62,6 +88,8 @@ router.post("/rate-product/:productId", verifyToken, rateProduct);
 router.post("/addBanner",verifyToken, upload, banner);
 router.put("/update-banner-status/:id", upload, updateBannerStatus); 
 router.post("/update-banner-approval/:id", updateBannerApproval);
+router.post("/addPlans", addPlans);
+router.get("/getPlans", getPlans);
 
 router.get("/getBanner",verifyToken, getBanner);
 router.get("/get-all-banner", getAllBanner);

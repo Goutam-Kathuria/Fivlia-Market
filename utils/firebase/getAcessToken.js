@@ -1,32 +1,20 @@
-// getAccessToken.js
-const { google } = require("googleapis");
-const path = require("path");
-const fs = require("fs");
-
-const keyPath = path.join(__dirname, "fivlia.json");
-
-const keyFile = JSON.parse(fs.readFileSync(keyPath, "utf8"));
-
-const SCOPES = ["https://www.googleapis.com/auth/firebase.messaging"];
-
-const jwtClient = new google.auth.JWT({
-  email: keyFile.client_email,
-  key: keyFile.private_key,
-  scopes: SCOPES,
-});
+const { initFirebase } = require("./firebase");
 
 const getAccessToken = async () => {
   try {
-    const tokens = await jwtClient.authorize();
+    const firebaseAdmin = initFirebase();
+    const credential = firebaseAdmin.app().options.credential;
+    if (!credential || typeof credential.getAccessToken !== "function") {
+      return null;
+    }
 
-    console.log("ACCESS TOKEN:", tokens.access_token);
-
-    return tokens.access_token;
-  } catch (err) {
-    console.error("❌ Failed to get access token:", err.message);
+    const tokenResponse = await credential.getAccessToken();
+    // console.log("tokenResponse",tokenResponse)
+    return tokenResponse?.access_token || null;
+  } catch (error) {
+    console.error("Failed to get access token:", error.message);
     return null;
   }
 };
-getAccessToken();
-
+// getAccessToken()
 module.exports = getAccessToken;

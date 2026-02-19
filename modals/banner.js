@@ -21,7 +21,11 @@ const bannerSchema = new mongoose.Schema(
     },
     approvalReason: { type: String, default: "" },
     approvedAt: { type: Date },
+    selectedPlanId: { type: mongoose.Schema.Types.ObjectId, ref: "banner_plan" },
+    fromDate: Date,
+    toDate: Date,
     status: { type: Boolean, default: false },
+    transactionId:String
   },
   { timestamps: true }
 );

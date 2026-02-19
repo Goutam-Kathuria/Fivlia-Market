@@ -1,12 +1,71 @@
 const Banner = require("../modals/banner");
 const User = require("../modals/user");
 const Category = require("../modals/category");
+const BannerPlan = require("../modals/banner_plan");
 const { getBannersWithinRadius } = require("../utils/location");
+const expireBanner = require("../utils/expireBanner");
+
+const DEFAULT_PLAN_DURATION_DAYS = 30;
+const MILLISECONDS_IN_A_DAY = 24 * 60 * 60 * 1000;
+
+const parseBooleanInput = (value) => {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") {
+    if (value === 1) return true;
+    if (value === 0) return false;
+    return null;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1") return true;
+    if (normalized === "false" || normalized === "0") return false;
+  }
+
+  return null;
+};
+
+const parseDurationToDays = (durationText) => {
+  if (durationText === undefined || durationText === null) {
+    return DEFAULT_PLAN_DURATION_DAYS;
+  }
+
+  const rawText = String(durationText).trim().toLowerCase();
+  if (!rawText) return DEFAULT_PLAN_DURATION_DAYS;
+
+  const numberMatch = rawText.match(/(\d+(\.\d+)?)/);
+  if (!numberMatch) return DEFAULT_PLAN_DURATION_DAYS;
+
+  const amount = Number(numberMatch[1]);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return DEFAULT_PLAN_DURATION_DAYS;
+  }
+
+  let multiplier = null;
+
+  if (/\b(year|years|yr|yrs|y)\b/.test(rawText)) {
+    multiplier = 365;
+  } else if (/\b(month|months|mon|mons|mo)\b/.test(rawText)) {
+    multiplier = 30;
+  } else if (/\b(week|weeks|wk|wks|w)\b/.test(rawText)) {
+    multiplier = 7;
+  } else if (/\b(day|days|dy|d)\b/.test(rawText)) {
+    multiplier = 1;
+  } else if (/^\d+(\.\d+)?$/.test(rawText)) {
+    multiplier = 1;
+  }
+
+  if (!multiplier) return DEFAULT_PLAN_DURATION_DAYS;
+
+  const totalDays = Math.ceil(amount * multiplier);
+  return totalDays > 0 ? totalDays : DEFAULT_PLAN_DURATION_DAYS;
+};
 
 exports.banner = async (req, res) => {
   try {
     const userId = req.user;
-    let { title, mainCategory, subCategory, cityId, status, expiryDays } = req.body;
+    let { title, mainCategory, subCategory, cityId, selectedPlanId, transactionId } = req.body;
     const rawImagePath = req.files?.image?.[0]?.key || "";
     const image = rawImagePath ? `/${rawImagePath}` : "";
 
@@ -31,16 +90,28 @@ exports.banner = async (req, res) => {
         return res
           .status(404)
           .json({ message: `SubCategory ${subCategory} not found` });
+    }
+
+    let selectedPlan = null;
+    if (selectedPlanId) {
+      selectedPlan = await BannerPlan.findById(selectedPlanId).select("_id");
+      if (!selectedPlan) {
+        return res
+          .status(404)
+          .json({ message: `Plan ${selectedPlanId} not found` });
       }
+    }
 
     const newBanner = await Banner.create({
       image,
       title,
       userId,
       cityId,
+      selectedPlanId: selectedPlan ? selectedPlan._id : undefined,
       aprroveStatus: "pending",
       approvalReason: "",
       status: false,
+      transactionId,
       mainCategory: foundCategory
         ? {
             _id: foundCategory._id,
@@ -54,7 +125,6 @@ exports.banner = async (req, res) => {
             name: foundSubCategory.name,
           }
         : null,
-
     });
     return res
       .status(200)
@@ -69,6 +139,8 @@ exports.banner = async (req, res) => {
 
 exports.getBanner = async (req, res) => {
   try {
+    await expireBanner();
+
     const { categoryId, myAds } = req.query;
     const userId = req.user;
 
@@ -94,7 +166,7 @@ exports.getBanner = async (req, res) => {
     const userLng = user.longitude;
 
     // 🔎 Apply base filters
-    const filters = { aprroveStatus: "active" };
+    const filters = { aprroveStatus: "active", status: true };
     if (categoryId) {
       filters.$or = [
         { "mainCategory._id": categoryId },
@@ -291,8 +363,18 @@ exports.updateBannerStatus = async (req, res) => {
 };
 
 exports.getAllBanner = async (req, res) => {
-  const allBanner = await Banner.find().sort({ createdAt: -1 });
-  res.json(allBanner);
+  try {
+    await expireBanner();
+
+    const allBanner = await Banner.find().sort({ createdAt: -1 });
+    return res.json(allBanner);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "Error fetching all banners.",
+      error: error.message,
+    });
+  }
 };
 
 exports.updateBannerApproval = async (req, res) => {
@@ -305,12 +387,49 @@ exports.updateBannerApproval = async (req, res) => {
       return res.status(400).json({ message: "Invalid approval status" });
     }
 
+    const existingBanner = await Banner.findById(id).select("selectedPlanId");
+    if (!existingBanner) {
+      return res.status(404).json({ message: "Banner not found" });
+    }
+
     const updateData = { aprroveStatus };
 
     if (aprroveStatus === "active") {
+      let selectedPlan = null;
+
+      if (existingBanner.selectedPlanId) {
+        selectedPlan = await BannerPlan.findOne({
+          _id: existingBanner.selectedPlanId,
+          status: true,
+        })
+          .select("_id duration")
+          .lean();
+      }
+
+      if (!selectedPlan) {
+        selectedPlan = await BannerPlan.findOne({ status: true })
+          .sort({ price: 1, createdAt: -1 })
+          .select("_id duration")
+          .lean();
+      }
+
+      if (!selectedPlan) {
+        return res.status(400).json({
+          message:
+            "No active banner plan found. Add at least one active plan first.",
+        });
+      }
+
+      const now = new Date();
+      const durationDays = parseDurationToDays(selectedPlan.duration);
+      const toDate = new Date(now.getTime() + durationDays * MILLISECONDS_IN_A_DAY);
+
       updateData.status = true;
       updateData.approvalReason = "";
-      updateData.approvedAt = new Date();
+      updateData.approvedAt = now;
+      updateData.fromDate = now;
+      updateData.toDate = toDate;
+      updateData.selectedPlanId = selectedPlan._id;
     }
 
     if (aprroveStatus === "rejected" || aprroveStatus === "resubmit") {
@@ -330,10 +449,16 @@ exports.updateBannerApproval = async (req, res) => {
       updateData.approvedAt = null;
     }
 
+    if (aprroveStatus === "expired") {
+      updateData.status = false;
+    }
+
     const updated = await Banner.findByIdAndUpdate(id, updateData, {
       new: true,
     });
-    if (!updated) return res.status(404).json({ message: "Banner not found" });
+    if (!updated) {
+      return res.status(404).json({ message: "Banner not found" });
+    }
 
     return res.status(200).json({
       message: "Banner approval status updated",
@@ -344,6 +469,74 @@ exports.updateBannerApproval = async (req, res) => {
     return res.status(500).json({
       message: "Error updating banner approval status.",
       error: err.message,
+    });
+  }
+};
+
+exports.addPlans = async (req, res) =>{
+  try{
+    const { duration, price, status } = req.body;
+
+    if (!duration || String(duration).trim() === "") {
+      return res.status(400).json({ message: "Duration is required" });
+    }
+
+    const parsedPrice = Number(price);
+    if (!Number.isFinite(parsedPrice)) {
+      return res.status(400).json({ message: "Valid price is required" });
+    }
+
+    const parsedStatus = parseBooleanInput(status);
+    if (status !== undefined && parsedStatus === null) {
+      return res.status(400).json({ message: "Status must be true or false" });
+    }
+
+    const payload = {
+      duration: String(duration).trim(),
+      price: parsedPrice,
+    };
+
+    if (parsedStatus !== undefined) {
+      payload.status = parsedStatus;
+    }
+
+    const plan = await BannerPlan.create(payload);
+
+    return res.status(201).json({
+      message: "Banner plan added successfully.",
+      data: plan,
+    });
+  }catch(error){
+    console.error(error);
+    return res.status(500).json({
+      message: "Error adding banner plan.",
+      error: error.message,
+    });
+  }
+};
+
+exports.getPlans = async (req, res) =>{
+  try{
+    const { includeInactive } = req.query;
+    const filter = {};
+
+    if (String(includeInactive).toLowerCase() !== "true") {
+      filter.status = true;
+    }
+
+    const plans = await BannerPlan.find(filter).sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      message: "Banner plans fetched successfully.",
+      count: plans.length,
+      data: plans,
+    });
+
+  } catch(error){
+    console.error(error);
+    return res.status(500).json({
+      message: "Error fetching banner plans.",
+      error: error.message,
     });
   }
 };

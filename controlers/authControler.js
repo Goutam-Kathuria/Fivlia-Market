@@ -1,6 +1,10 @@
 const User = require("../modals/user");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const {
+  normalizeFcmToken,
+  isLikelyFcmToken,
+} = require("../utils/firebase/fcmToken");
 
 exports.register = async (req, res) => {
   try {
@@ -44,14 +48,9 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const isValidFcmToken =
-      typeof fcmToken === "string" &&
-      fcmToken.trim().length > 0 &&
-      fcmToken !== "null" &&
-      fcmToken !== "undefined";
-
-    if (isValidFcmToken) {
-      user.fcmToken = fcmToken.trim();
+    const normalizedFcmToken = normalizeFcmToken(fcmToken);
+    if (isLikelyFcmToken(normalizedFcmToken)) {
+      user.fcmToken = normalizedFcmToken;
       await user.save();
     }
 
@@ -69,6 +68,35 @@ exports.login = async (req, res) => {
     return res
       .status(500)
       .json({ message: "Server error", error: error.message });
+  }
+};
+
+exports.updateFcmToken = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id || req.user;
+    const normalizedFcmToken = normalizeFcmToken(req.body?.fcmToken);
+
+    if (!isLikelyFcmToken(normalizedFcmToken)) {
+      return res.status(400).json({ message: "Invalid FCM token" });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: { fcmToken: normalizedFcmToken } },
+      { new: true },
+    ).select("_id fcmToken updatedAt");
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.status(200).json({
+      message: "FCM token updated successfully",
+      data: updatedUser,
+    });
+  } catch (error) {
+    console.error("Update FCM token error:", error);
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -94,5 +122,30 @@ exports.getProfile = async (req, res) => {
     return res
       .status(500)
       .json({ message: "Server error", error: err.message });
+  }
+};
+
+exports.editProfile = async (req, res) => {
+  try {
+    const userId = req.user;
+    const { name, password, mobileNumber, email } = req.body;
+
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (password !== undefined) updateData.password = password;
+    if (mobileNumber !== undefined) updateData.mobileNumber = mobileNumber;
+    if (email !== undefined) updateData.email = email;
+    if (name !== undefined) updateData.name = name;
+    if (req.files?.image) {
+      updateData.image = req.files.image.map((f) => `/${f.key}`);
+    }
+    await User.findByIdAndUpdate(userId, updateData, {
+      new: true,
+    });
+
+    return res.status(200).json({ message: "Profile Update" });
+  } catch (error) {
+    console.error("Error creating store:", error);
+    return res.status(500).json({ message: "Server error" });
   }
 };
