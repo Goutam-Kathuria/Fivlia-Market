@@ -46,7 +46,7 @@ const { addProduct, getProduct, getPublicListing, updateProductStatus, editProdu
 router.post("/register", register);
 router.post("/login", login);
 router.post("/update-fcm-token", verifyToken, updateFcmToken);
-router.post("/edit-profile", verifyToken, editProfile);
+router.post("/edit-profile", upload, verifyToken, editProfile);
 
 router.post("/admin/update-setting", adminSetting);
 router.post("/admin/addBanner", upload, addAdminBanner);
