@@ -137,7 +137,7 @@ exports.editProfile = async (req, res) => {
     if (email !== undefined) updateData.email = email;
     if (name !== undefined) updateData.name = name;
     if (req.files?.image) {
-      updateData.image = req.files.image.map((f) => `/${f.key}`);
+      updateData.image = `/${req.files.image[0].key}`;
     }
     await User.findByIdAndUpdate(userId, updateData, {
       new: true,
