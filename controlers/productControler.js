@@ -419,13 +419,17 @@ exports.rateProduct = async (req, res) => {
 
     const ratingValue = Number(value);
     if (!ratingValue || ratingValue < 1 || ratingValue > 5) {
-      return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      return res
+        .status(400)
+        .json({ message: "Rating must be between 1 and 5" });
     }
 
     const product = await products.findById(productId).select("_id");
     if (!product) return res.status(404).json({ message: "Product not found" });
 
-    const existing = await Rating.findOne({ productId, userId }).select("value");
+    const existing = await Rating.findOne({ productId, userId }).select(
+      "value",
+    );
 
     if (existing) {
       await Rating.findOneAndUpdate(
@@ -482,6 +486,34 @@ exports.rateProduct = async (req, res) => {
     console.error(error);
     return res.status(500).json({
       message: "Failed to rate product",
+      error: error.message,
+    });
+  }
+};
+
+exports.deleteProduct = async (req, res) => {
+  try {
+    const userId = req.user;
+    const { productId } = req.params;
+
+    const deletedProduct = await products.findOneAndDelete({
+      _id: productId,
+       userId: userId, // 🔐 only owner can delete
+    });
+
+
+    if (!deletedProduct) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    return res.status(200).json({
+      message: "Product Deleted",
+      deletedProduct,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "Failed to delete product",
       error: error.message,
     });
   }
