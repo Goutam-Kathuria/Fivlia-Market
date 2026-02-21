@@ -192,6 +192,7 @@ exports.addAdminBanner = async (req, res) => {
 exports.adminSetting = async (req, res) => {
   try {
     const { name, email, password, term_and_conditons, radius } = req.body;
+    const rawImagePath = req.files?.image?.[0]?.key;
 
     const updateData = {};
 
@@ -213,6 +214,10 @@ exports.adminSetting = async (req, res) => {
 
     if (radius !== undefined) {
       updateData.radius = radius;
+    }
+
+    if (rawImagePath) {
+      updateData.image = `/${rawImagePath}`;
     }
 
     await setting.findOneAndUpdate(

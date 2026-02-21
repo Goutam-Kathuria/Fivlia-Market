@@ -6,7 +6,8 @@ const settingSchemma = new mongoose.Schema(
     radius:Number,
     name:String,
     email:String,
-    password:String
+    password:String,
+    image:String
   },
   { timestamps: true }
 );

@@ -61,7 +61,7 @@ router.post("/admin/login", adminLogin);
 router.post("/update-fcm-token", verifyToken, updateFcmToken);
 router.post("/edit-profile", upload, verifyToken, editProfile);
 
-router.post("/admin/update-setting", adminSetting);
+router.post("/admin/update-setting", upload, adminSetting);
 router.post("/admin/addBanner", upload, addAdminBanner);
 router.post("/save-location", verifyToken, saveLocation);
 router.get("/get-city", getCity);
