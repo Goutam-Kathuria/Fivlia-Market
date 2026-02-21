@@ -5,6 +5,7 @@ const Notification = require("../modals/notification");
 const Banner = require("../modals/banner");
 const Category = require("../modals/category");
 const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
 const { getDistanceKm } = require("../utils/location");
 const sendFcmPush = require("../utils/firebase/sendNotification");
 const {
@@ -190,9 +191,21 @@ exports.addAdminBanner = async (req, res) => {
 
 exports.adminSetting = async (req, res) => {
   try {
-    const {name, email, term_and_conditons, radius } = req.body;
+    const { name, email, password, term_and_conditons, radius } = req.body;
 
     const updateData = {};
+
+    if (name !== undefined) {
+      updateData.name = name;
+    }
+
+    if (email !== undefined) {
+      updateData.email = email;
+    }
+
+    if (password !== undefined) {
+      updateData.password = password;
+    }
 
     if (term_and_conditons !== undefined) {
       updateData.term_and_conditons = term_and_conditons;
@@ -215,6 +228,67 @@ exports.adminSetting = async (req, res) => {
     console.error(error);
     return res.status(500).json({
       message: "Failed to update setting",
+    });
+  }
+};
+
+exports.adminLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        message: "Email and password are required",
+      });
+    }
+
+    const settings = await setting.findOne().lean();
+    if (!settings || !settings.email || !settings.password) {
+      return res.status(404).json({
+        message: "Admin credentials are not configured. Please update settings first.",
+      });
+    }
+
+    const incomingEmail = String(email).trim().toLowerCase();
+    const storedEmail = String(settings.email).trim().toLowerCase();
+    const incomingPassword = String(password);
+    const storedPassword = String(settings.password);
+
+    if (incomingEmail !== storedEmail || incomingPassword !== storedPassword) {
+      return res.status(401).json({
+        message: "Invalid admin credentials",
+      });
+    }
+
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({
+        message: "JWT secret is not configured",
+      });
+    }
+
+    const token = jwt.sign(
+      {
+        id: settings._id,
+        role: "admin",
+        email: settings.email,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" },
+    );
+
+    return res.status(200).json({
+      message: "Admin login successful",
+      token,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      admin: {
+        name: settings.name || "",
+        email: settings.email || "",
+      },
+    });
+  } catch (error) {
+    console.error("Admin login error:", error);
+    return res.status(500).json({
+      message: "Failed to login as admin",
     });
   }
 };

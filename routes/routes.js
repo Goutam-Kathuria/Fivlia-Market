@@ -25,6 +25,7 @@ const {
 const { saveLocation, getCity } = require("../controlers/locationControler");
 const {
   adminSetting,
+  adminLogin,
   getAdminSetting,
   createNotification,
   editNotification,
@@ -56,6 +57,7 @@ const {
 
 router.post("/register", register);
 router.post("/login", login);
+router.post("/admin/login", adminLogin);
 router.post("/update-fcm-token", verifyToken, updateFcmToken);
 router.post("/edit-profile", upload, verifyToken, editProfile);
 
