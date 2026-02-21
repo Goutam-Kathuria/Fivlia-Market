@@ -65,7 +65,14 @@ const parseDurationToDays = (durationText) => {
 exports.banner = async (req, res) => {
   try {
     const userId = req.user;
-    let { title, mainCategory, subCategory, cityId, selectedPlanId, transactionId } = req.body;
+    let {
+      title,
+      mainCategory,
+      subCategory,
+      cityId,
+      selectedPlanId,
+      transactionId,
+    } = req.body;
     const rawImagePath = req.files?.image?.[0]?.key || "";
     const image = rawImagePath ? `/${rawImagePath}` : "";
 
@@ -83,7 +90,7 @@ exports.banner = async (req, res) => {
 
     if (hasSubCategory) {
       foundSubCategory = foundCategory.subcat.find(
-        (sub) => sub._id.toString() === subCategory
+        (sub) => sub._id.toString() === subCategory,
       );
 
       if (!foundSubCategory)
@@ -133,7 +140,7 @@ exports.banner = async (req, res) => {
     console.error(error);
     return res
       .status(500)
-      .json({ message: "An Error Occured", error: error.message });
+      .json({ message: "An Error Occured" });
   }
 };
 
@@ -182,7 +189,7 @@ exports.getBanner = async (req, res) => {
     const matchedBanners = await getBannersWithinRadius(
       userLat,
       userLng,
-      allBanners
+      allBanners,
     );
 
     if (!matchedBanners.length) {
@@ -202,7 +209,6 @@ exports.getBanner = async (req, res) => {
     console.error("❌ Error fetching banners:", error);
     return res.status(500).json({
       message: "An error occurred while fetching banners.",
-      error: error.message,
       count: 0,
       data: [],
     });
@@ -292,7 +298,7 @@ exports.updateBannerStatus = async (req, res) => {
 
       if (subCategory) {
         const foundSubCategory = foundCategory.subcat.find(
-          (sub) => sub._id.toString() === subCategory
+          (sub) => sub._id.toString() === subCategory,
         );
         if (!foundSubCategory) {
           return res
@@ -306,7 +312,7 @@ exports.updateBannerStatus = async (req, res) => {
 
         if (subSubCategory) {
           const foundSubSubCategory = foundSubCategory.subsubcat.find(
-            (subsub) => subsub._id.toString() === subSubCategory
+            (subsub) => subsub._id.toString() === subSubCategory,
           );
           if (!foundSubSubCategory) {
             return res
@@ -342,7 +348,7 @@ exports.updateBannerStatus = async (req, res) => {
     // Update document
     const updatedBanner = await Banner.updateOne(
       { _id: id },
-      { $set: updateData }
+      { $set: updateData },
     );
 
     if (updatedBanner.modifiedCount === 0) {
@@ -372,7 +378,6 @@ exports.getAllBanner = async (req, res) => {
     console.error(error);
     return res.status(500).json({
       message: "Error fetching all banners.",
-      error: error.message,
     });
   }
 };
@@ -422,7 +427,9 @@ exports.updateBannerApproval = async (req, res) => {
 
       const now = new Date();
       const durationDays = parseDurationToDays(selectedPlan.duration);
-      const toDate = new Date(now.getTime() + durationDays * MILLISECONDS_IN_A_DAY);
+      const toDate = new Date(
+        now.getTime() + durationDays * MILLISECONDS_IN_A_DAY,
+      );
 
       updateData.status = true;
       updateData.approvalReason = "";
@@ -434,9 +441,7 @@ exports.updateBannerApproval = async (req, res) => {
 
     if (aprroveStatus === "rejected" || aprroveStatus === "resubmit") {
       if (!approvalReason || approvalReason.trim() === "") {
-        return res
-          .status(400)
-          .json({ message: "Approval reason is required" });
+        return res.status(400).json({ message: "Approval reason is required" });
       }
       updateData.status = false;
       updateData.approvalReason = approvalReason.trim();
@@ -473,8 +478,8 @@ exports.updateBannerApproval = async (req, res) => {
   }
 };
 
-exports.addPlans = async (req, res) =>{
-  try{
+exports.addPlans = async (req, res) => {
+  try {
     const { duration, price, status } = req.body;
 
     if (!duration || String(duration).trim() === "") {
@@ -506,17 +511,16 @@ exports.addPlans = async (req, res) =>{
       message: "Banner plan added successfully.",
       data: plan,
     });
-  }catch(error){
+  } catch (error) {
     console.error(error);
     return res.status(500).json({
       message: "Error adding banner plan.",
-      error: error.message,
     });
   }
 };
 
-exports.getPlans = async (req, res) =>{
-  try{
+exports.getPlans = async (req, res) => {
+  try {
     const { includeInactive } = req.query;
     const filter = {};
 
@@ -531,12 +535,61 @@ exports.getPlans = async (req, res) =>{
       count: plans.length,
       data: plans,
     });
-
-  } catch(error){
+  } catch (error) {
     console.error(error);
     return res.status(500).json({
       message: "Error fetching banner plans.",
-      error: error.message,
     });
+  }
+};
+
+exports.editPlans = async (req, res) => {
+  try {
+    const { planId } = req.params;
+
+    const update = {};
+
+    if (req.body.duration !== undefined) {
+      update.duration = String(req.body.duration).trim();
+    }
+
+    if (req.body.price !== undefined) {
+      const price = Number(req.body.price);
+      if (!Number.isFinite(price)) {
+        return res.status(400).json({ message: "Invalid price" });
+      }
+      update.price = price;
+    }
+
+    if (req.body.status !== undefined) {
+      update.status =
+        req.body.status === true ||
+        req.body.status === "true" ||
+        req.body.status === 1 ||
+        req.body.status === "1";
+    }
+
+    if (!Object.keys(update).length) {
+      return res.status(400).json({ message: "Nothing to update" });
+    }
+
+    const plan = await BannerPlan.findByIdAndUpdate(
+      planId,
+      update,
+      { new: true }
+    );
+
+    if (!plan) {
+      return res.status(404).json({ message: "Plan not found" });
+    }
+
+    res.json({
+      message: "Plan updated",
+      data: plan
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Update failed" });
   }
 };

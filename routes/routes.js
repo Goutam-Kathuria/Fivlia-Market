@@ -18,6 +18,7 @@ const {
   updateBannerStatus,
   updateBannerApproval,
   addPlans,
+  editPlans,
   getPlans,
 } = require("../controlers/bannerControler");
 
@@ -100,6 +101,7 @@ router.post("/addBanner", verifyToken, upload, banner);
 router.put("/update-banner-status/:id", upload, updateBannerStatus);
 router.post("/update-banner-approval/:id", updateBannerApproval);
 router.post("/addPlans", addPlans);
+router.post("/edit-elans/:planId", editPlans);
 router.get("/getPlans", getPlans);
 
 router.get("/getBanner", verifyToken, getBanner);

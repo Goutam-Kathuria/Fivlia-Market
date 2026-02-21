@@ -34,9 +34,7 @@ exports.login = async (req, res) => {
     const { mobileNumber, email, fcmToken, password } = req.body;
 
     if (!mobileNumber || !password) {
-      return res
-        .status(400)
-        .json({ message: "mobileNumber and password are required" });
+      return res.status(400).json({ message: "mobileNumber and password are required" });
     }
 
     const user = await User.findOne({ mobileNumber });
@@ -54,7 +52,6 @@ exports.login = async (req, res) => {
       await user.save();
     }
 
-    // Generate JWT token
     const token = jwt.sign(
       { id: user._id, mobileNumber: user.mobileNumber },
       process.env.JWT_SECRET,

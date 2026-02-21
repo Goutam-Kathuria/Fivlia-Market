@@ -4,9 +4,9 @@ const settingSchemma = new mongoose.Schema(
   {
     term_and_conditons:String,
     radius:Number,
-    // name:String,
-    // email:String,
-    // password:String
+    name:String,
+    email:String,
+    password:String
   },
   { timestamps: true }
 );

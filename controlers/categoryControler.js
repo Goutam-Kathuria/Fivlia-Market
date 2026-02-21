@@ -31,7 +31,7 @@ exports.saveCategory = async (req, res) => {
     }
 
     let image;
-console.log(req.files?.image)
+    console.log(req.files?.image);
     if (req.files?.image) {
       image = `/${req.files?.image?.[0]?.key}` || req.body.image || "";
     }
@@ -152,10 +152,7 @@ exports.saveSubEntity = async (req, res) => {
     const { catId } = req.params;
     const { subId } = req.query;
     let { name, description, attribute, city, commison, status } = req.body;
-        console.log(req.files?.image)
 
-    const image = `/${req.files?.image?.[0]?.key}` || req.body.image || "";
-    console.log(image)
     if (typeof city === "string") {
       try {
         city = JSON.parse(city);
@@ -180,6 +177,13 @@ exports.saveSubEntity = async (req, res) => {
     if (subId) {
       const sub = category.subcat.id(subId);
       if (sub) {
+        let image = sub.image;
+
+        // ✅ Replace only if new file uploaded
+        if (req.files?.image?.length) {
+          image = `/${req.files.image[0].key}`;
+        }
+
         Object.assign(sub, {
           name,
           description,
@@ -196,6 +200,7 @@ exports.saveSubEntity = async (req, res) => {
         });
       }
     }
+    const image = `/${req.files?.image?.[0]?.key}` || "";
 
     // Add new Subcategory
     category.subcat.push({
@@ -213,6 +218,7 @@ exports.saveSubEntity = async (req, res) => {
       subcategories: category.subcat,
     });
   } catch (err) {
+    console.error(err)
     res
       .status(500)
       .json({ message: "❌ Failed to save sub-entity", error: err.message });

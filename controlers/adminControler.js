@@ -190,7 +190,7 @@ exports.addAdminBanner = async (req, res) => {
 
 exports.adminSetting = async (req, res) => {
   try {
-    const { term_and_conditons, radius } = req.body;
+    const {name, email, term_and_conditons, radius } = req.body;
 
     const updateData = {};
 
