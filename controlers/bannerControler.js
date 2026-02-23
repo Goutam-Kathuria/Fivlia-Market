@@ -114,9 +114,12 @@ exports.banner = async (req, res) => {
           .json({ message: `SubCategory ${subCategory} not found` });
     }
 
-    const selectedPlan = await BannerPlan.findById(selectedPlanId).select("_id");
+    const selectedPlan =
+      await BannerPlan.findById(selectedPlanId).select("_id");
     if (!selectedPlan) {
-      return res.status(404).json({ message: `Plan ${selectedPlanId} not found` });
+      return res
+        .status(404)
+        .json({ message: `Plan ${selectedPlanId} not found` });
     }
 
     const newBanner = await Banner.create({
@@ -138,9 +141,7 @@ exports.banner = async (req, res) => {
       .json({ message: "Banner Added Successfully", newBanner });
   } catch (error) {
     console.error(error);
-    return res
-      .status(500)
-      .json({ message: "An Error Occured" });
+    return res.status(500).json({ message: "An Error Occured" });
   }
 };
 
@@ -374,8 +375,40 @@ exports.getAllBanner = async (req, res) => {
   try {
     await expireBanner();
 
-    const allBanner = await Banner.find().sort({ createdAt: -1 });
-    return res.json(allBanner);
+    const banners = await Banner.find()
+      .sort({ createdAt: -1 })
+
+      // Main category name
+      .populate({
+        path: "mainCategory",
+        select: "name",
+      })
+
+      // Sub category name
+      .populate({
+        path: "subCategory",
+        select: "name",
+      })
+
+      // City name only
+      .populate({
+        path: "cityId",
+        select: "city",
+      })
+
+      // User name + mobile only
+      .populate({
+        path: "userId",
+        select: "name mobileNumber",
+      })
+
+      // Plan details
+      .populate({
+        path: "selectedPlanId",
+        select: "duration price",
+      });
+
+    return res.json(banners);
   } catch (error) {
     console.error(error);
     return res.status(500).json({
@@ -575,11 +608,9 @@ exports.editPlans = async (req, res) => {
       return res.status(400).json({ message: "Nothing to update" });
     }
 
-    const plan = await BannerPlan.findByIdAndUpdate(
-      planId,
-      update,
-      { new: true }
-    );
+    const plan = await BannerPlan.findByIdAndUpdate(planId, update, {
+      new: true,
+    });
 
     if (!plan) {
       return res.status(404).json({ message: "Plan not found" });
@@ -587,9 +618,8 @@ exports.editPlans = async (req, res) => {
 
     res.json({
       message: "Plan updated",
-      data: plan
+      data: plan,
     });
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Update failed" });
