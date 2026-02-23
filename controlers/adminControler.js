@@ -164,16 +164,8 @@ exports.addAdminBanner = async (req, res) => {
       fromDate: parsedFromDate,
       toDate: parsedToDate,
       status: shouldBeActive,
-      mainCategory: {
-        _id: foundCategory._id,
-        name: foundCategory.name,
-      },
-      subCategory: foundSubCategory
-        ? {
-            _id: foundSubCategory._id,
-            name: foundSubCategory.name,
-          }
-        : null,
+      mainCategory: foundCategory._id,
+      subCategory: foundSubCategory ? foundSubCategory._id : null,
     });
 
     return res.status(201).json({

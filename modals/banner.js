@@ -4,16 +4,11 @@ const bannerSchema = new mongoose.Schema(
   {
     image: String,
     title: { type: String },
-    mainCategory: {
-      name: { type: String },
-      _id: { type: mongoose.Schema.Types.ObjectId, ref: "Categories" },
-    },
-    subCategory: {
-      name: { type: String },
-      _id: { type: mongoose.Schema.Types.ObjectId },
-    },
-    cityId: {type: mongoose.Schema.Types.ObjectId, ref: "locations"},
-    userId: {type: mongoose.Schema.Types.ObjectId, ref: "User"},
+    mainCategory: { type: mongoose.Schema.Types.ObjectId, ref: "Category" },
+    subCategory: { type: mongoose.Schema.Types.ObjectId },
+    cityId: { type: mongoose.Schema.Types.ObjectId, ref: "locations" },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: "product" },
     aprroveStatus: {
       type: String,
       default: "pending",
@@ -21,13 +16,16 @@ const bannerSchema = new mongoose.Schema(
     },
     approvalReason: { type: String, default: "" },
     approvedAt: { type: Date },
-    selectedPlanId: { type: mongoose.Schema.Types.ObjectId, ref: "banner_plan" },
+    selectedPlanId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "banner_plan",
+    },
     fromDate: Date,
     toDate: Date,
     status: { type: Boolean, default: false },
-    transactionId:String
+    transactionId: String,
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 module.exports = mongoose.model("Banner", bannerSchema);
 

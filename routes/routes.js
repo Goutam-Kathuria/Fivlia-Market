@@ -3,6 +3,7 @@ const upload = require("../middleware/multer");
 const router = express.Router();
 
 const verifyToken = require("../middleware/authToken"); // Optional, if needed
+const verifyAdminToken = require("../middleware/adminAuth");
 
 const {
   saveCategory,
@@ -62,7 +63,7 @@ router.post("/update-fcm-token", verifyToken, updateFcmToken);
 router.post("/edit-profile", upload, verifyToken, editProfile);
 
 router.post("/admin/update-setting", upload, adminSetting);
-router.post("/admin/addBanner", upload, addAdminBanner);
+router.post("/admin/addBanner", verifyAdminToken, upload, addAdminBanner);
 router.post("/save-location", verifyToken, saveLocation);
 router.get("/get-city", getCity);
 router.get("/getUsers", getUsers);
@@ -91,17 +92,17 @@ router.patch("/toggleStatus/:catId", toggleStatus);
 router.post("/addProduct", upload, verifyToken, addProduct);
 router.get("/getProduct", getProduct);
 router.get("/get-public-listing", verifyToken, getPublicListing);
-router.post("/update-product-status/:productId", updateProductStatus);
+router.post("/update-product-status/:productId", verifyAdminToken, updateProductStatus);
 router.post("/edit-product/:productId", upload, editProduct);
 router.post("/repost-product/:productId", upload, repostProduct);
-router.get("/get-product-for-approvals", getProductForApprovals);
+router.get("/get-product-for-approvals", verifyAdminToken, getProductForApprovals);
 router.post("/rate-product/:productId", verifyToken, rateProduct);
 router.delete("/delete-product/:productId", verifyToken, deleteProduct);
 // ---------------- BANNER ROUTES ----------------
 // Add or Update BANNER
 router.post("/addBanner", verifyToken, upload, banner);
 router.put("/update-banner-status/:id", upload, updateBannerStatus);
-router.post("/update-banner-approval/:id", updateBannerApproval);
+router.post("/update-banner-approval/:id", verifyAdminToken, updateBannerApproval);
 router.post("/addPlans", addPlans);
 router.post("/edit-elans/:planId", editPlans);
 router.get("/getPlans", getPlans);

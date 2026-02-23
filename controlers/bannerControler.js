@@ -62,6 +62,12 @@ const parseDurationToDays = (durationText) => {
   return totalDays > 0 ? totalDays : DEFAULT_PLAN_DURATION_DAYS;
 };
 
+const getCategoryIdString = (value) => {
+  if (!value) return "";
+  if (typeof value === "object" && value._id) return String(value._id);
+  return String(value);
+};
+
 exports.banner = async (req, res) => {
   try {
     const userId = req.user;
@@ -70,11 +76,20 @@ exports.banner = async (req, res) => {
       mainCategory,
       subCategory,
       cityId,
+      productId,
       selectedPlanId,
       transactionId,
     } = req.body;
     const rawImagePath = req.files?.image?.[0]?.key || "";
     const image = rawImagePath ? `/${rawImagePath}` : "";
+
+    if (!selectedPlanId || String(selectedPlanId).trim() === "") {
+      return res.status(400).json({ message: "selectedPlanId is required" });
+    }
+
+    if (!transactionId || String(transactionId).trim() === "") {
+      return res.status(400).json({ message: "transactionId is required" });
+    }
 
     if (!mainCategory)
       return res.status(400).json({ message: "Main category is required" });
@@ -99,14 +114,9 @@ exports.banner = async (req, res) => {
           .json({ message: `SubCategory ${subCategory} not found` });
     }
 
-    let selectedPlan = null;
-    if (selectedPlanId) {
-      selectedPlan = await BannerPlan.findById(selectedPlanId).select("_id");
-      if (!selectedPlan) {
-        return res
-          .status(404)
-          .json({ message: `Plan ${selectedPlanId} not found` });
-      }
+    const selectedPlan = await BannerPlan.findById(selectedPlanId).select("_id");
+    if (!selectedPlan) {
+      return res.status(404).json({ message: `Plan ${selectedPlanId} not found` });
     }
 
     const newBanner = await Banner.create({
@@ -114,24 +124,14 @@ exports.banner = async (req, res) => {
       title,
       userId,
       cityId,
-      selectedPlanId: selectedPlan ? selectedPlan._id : undefined,
+      selectedPlanId: selectedPlan._id,
       aprroveStatus: "pending",
       approvalReason: "",
+      productId,
       status: false,
-      transactionId,
-      mainCategory: foundCategory
-        ? {
-            _id: foundCategory._id,
-            name: foundCategory.name,
-          }
-        : null,
-
-      subCategory: foundSubCategory
-        ? {
-            _id: foundSubCategory._id,
-            name: foundSubCategory.name,
-          }
-        : null,
+      transactionId: String(transactionId).trim(),
+      mainCategory: foundCategory ? foundCategory._id : null,
+      subCategory: foundSubCategory ? foundSubCategory._id : null,
     });
     return res
       .status(200)
@@ -174,22 +174,28 @@ exports.getBanner = async (req, res) => {
 
     // 🔎 Apply base filters
     const filters = { aprroveStatus: "active", status: true };
-    if (categoryId) {
-      filters.$or = [
-        { "mainCategory._id": categoryId },
-        { "subCategory._id": categoryId },
-      ];
-    }
 
     const allBanners = await Banner.find(filters)
       .populate("cityId", "city latitude longitude")
       .lean()
       .sort({ createdAt: -1 });
 
+    const normalizedCategoryId = String(categoryId || "").trim();
+    const categoryMatchedBanners = normalizedCategoryId
+      ? allBanners.filter((bannerItem) => {
+          const mainCategoryId = getCategoryIdString(bannerItem.mainCategory);
+          const subCategoryId = getCategoryIdString(bannerItem.subCategory);
+          return (
+            mainCategoryId === normalizedCategoryId ||
+            subCategoryId === normalizedCategoryId
+          );
+        })
+      : allBanners;
+
     const matchedBanners = await getBannersWithinRadius(
       userLat,
       userLng,
-      allBanners,
+      categoryMatchedBanners,
     );
 
     if (!matchedBanners.length) {
@@ -291,10 +297,7 @@ exports.updateBannerStatus = async (req, res) => {
           .status(404)
           .json({ message: `Category ${mainCategory} not found` });
       }
-      updateData.mainCategory = {
-        _id: foundCategory._id,
-        name: foundCategory.name,
-      };
+      updateData.mainCategory = foundCategory._id;
 
       if (subCategory) {
         const foundSubCategory = foundCategory.subcat.find(
@@ -305,10 +308,7 @@ exports.updateBannerStatus = async (req, res) => {
             .status(404)
             .json({ message: `SubCategory ${subCategory} not found` });
         }
-        updateData.subCategory = {
-          _id: foundSubCategory._id,
-          name: foundSubCategory.name,
-        };
+        updateData.subCategory = foundSubCategory._id;
 
         if (subSubCategory) {
           const foundSubSubCategory = foundSubCategory.subsubcat.find(
@@ -324,6 +324,8 @@ exports.updateBannerStatus = async (req, res) => {
             name: foundSubSubCategory.name,
           };
         }
+      } else {
+        updateData.subCategory = null;
       }
     }
 
