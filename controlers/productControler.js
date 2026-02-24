@@ -102,7 +102,7 @@ exports.getProduct = async (req, res) => {
     if (isBrowseListing) {
       filter.productStatus = "active";
       filter.expiresAt = { $gt: new Date() };
-
+      filter.userId = { $ne: userId };
       const user = await Users.findById(userId).select("latitude longitude");
 
       if (user?.latitude && user?.longitude) {
@@ -119,7 +119,7 @@ exports.getProduct = async (req, res) => {
       filter.productStatus = "active";
       filter.expiresAt = { $gt: new Date() };
       filter.$or = [{ category: category }, { subCategory: category }];
-
+      filter.userId = { $ne: userId };
       const user = await Users.findById(userId).select("latitude longitude");
 
       userLat = user.latitude;
@@ -136,7 +136,7 @@ exports.getProduct = async (req, res) => {
     if (isSearchListing) {
       filter.productStatus = "active";
       filter.expiresAt = { $gt: new Date() };
-
+      filter.userId = { $ne: userId };
       filter.$or = [
         { name: { $regex: search, $options: "i" } },
         { description: { $regex: search, $options: "i" } },
