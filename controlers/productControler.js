@@ -369,6 +369,7 @@ exports.getPublicListing = async (req, res) => {
     let filter = {
       productStatus: "active",
       expiresAt: { $gt: new Date() },
+      userId: { $ne: userId },
     };
 
     const user = await Users.findById(userId).select("latitude longitude");
