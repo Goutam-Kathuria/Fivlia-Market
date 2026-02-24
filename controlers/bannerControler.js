@@ -152,60 +152,87 @@ exports.getBanner = async (req, res) => {
     const { categoryId, myAds } = req.query;
     const userId = req.user;
 
+    const attachSubCategory = (banners) =>
+      banners.map((banner) => {
+        const sub = banner.mainCategory?.subcat?.find(
+          (s) => String(s._id) === String(banner.subCategory),
+        );
+
+        return {
+          ...banner,
+
+          mainCategory: banner.mainCategory
+            ? {
+                _id: banner.mainCategory._id,
+                name: banner.mainCategory.name,
+              }
+            : null,
+
+          subCategory: sub
+            ? {
+                _id: sub._id,
+                name: sub.name,
+              }
+            : null,
+        };
+      });
+
+    // 👉 MY ADS
     if (myAds !== undefined) {
       const myBanners = await Banner.find({ userId })
+        .populate({
+          path: "mainCategory",
+          select: "name subcat",
+        })
         .lean()
         .sort({ createdAt: -1 });
+
+      const bannersWithSubcat = attachSubCategory(myBanners);
+
       return res.status(200).json({
         message: "Banners fetched successfully.",
-        count: myBanners.length,
-        data: myBanners,
+        count: bannersWithSubcat.length,
+        data: bannersWithSubcat,
       });
     }
 
+    // 👉 USER LOCATION
     const user = await User.findById(userId).lean();
 
-    if (!user || !user?.latitude || !user?.longitude) {
-      // console.log("❌ User location missing or incomplete");
+    if (!user?.latitude || !user?.longitude) {
       return res.status(400).json({ message: "User location not found" });
     }
 
-    const userLat = user.latitude;
-    const userLng = user.longitude;
-
-    // 🔎 Apply base filters
     const filters = { aprroveStatus: "active", status: true };
 
     const allBanners = await Banner.find(filters)
       .populate("cityId", "city latitude longitude")
+      .populate({
+        path: "mainCategory",
+        select: "name subcat",
+      })
       .lean()
       .sort({ createdAt: -1 });
 
+    const bannersWithSubcat = attachSubCategory(allBanners);
+
     const normalizedCategoryId = String(categoryId || "").trim();
+
     const categoryMatchedBanners = normalizedCategoryId
-      ? allBanners.filter((bannerItem) => {
-          const mainCategoryId = getCategoryIdString(bannerItem.mainCategory);
-          const subCategoryId = getCategoryIdString(bannerItem.subCategory);
+      ? bannersWithSubcat.filter((b) => {
+          const mainId = getCategoryIdString(b.mainCategory);
+          const subId = getCategoryIdString(b.subCategory);
           return (
-            mainCategoryId === normalizedCategoryId ||
-            subCategoryId === normalizedCategoryId
+            mainId === normalizedCategoryId || subId === normalizedCategoryId
           );
         })
-      : allBanners;
+      : bannersWithSubcat;
 
     const matchedBanners = await getBannersWithinRadius(
-      userLat,
-      userLng,
+      user.latitude,
+      user.longitude,
       categoryMatchedBanners,
     );
-
-    if (!matchedBanners.length) {
-      return res.status(200).json({
-        message: "No banners found for your location.",
-        count: 0,
-        data: [],
-      });
-    }
 
     return res.status(200).json({
       message: "Banners fetched successfully.",
@@ -216,7 +243,6 @@ exports.getBanner = async (req, res) => {
     console.error("❌ Error fetching banners:", error);
     return res.status(500).json({
       message: "An error occurred while fetching banners.",
-      count: 0,
       data: [],
     });
   }
