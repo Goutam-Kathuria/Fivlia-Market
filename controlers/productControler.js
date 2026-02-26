@@ -499,9 +499,8 @@ exports.deleteProduct = async (req, res) => {
 
     const deletedProduct = await products.findOneAndDelete({
       _id: productId,
-       userId: userId, // 🔐 only owner can delete
+      userId: userId, // 🔐 only owner can delete
     });
-
 
     if (!deletedProduct) {
       return res.status(404).json({ message: "Product not found" });
@@ -515,6 +514,38 @@ exports.deleteProduct = async (req, res) => {
     console.error(error);
     return res.status(500).json({
       message: "Failed to delete product",
+      error: error.message,
+    });
+  }
+};
+
+exports.getUserCategoryWiseProducts = async (req, res) => {
+  try {
+    const userId = req.user;
+    const { category, subCategory } = req.query;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    let filter = { userId, productStatus:"active" };
+    if (category) filter.category = category;
+    if (subCategory) filter.subCategory = subCategory;
+
+    const product = await products
+      .find(filter)
+      .populate("category")
+      .populate("subCategory")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      message: "Products fetched successfully",
+      product,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "Failed to fetch products",
       error: error.message,
     });
   }
