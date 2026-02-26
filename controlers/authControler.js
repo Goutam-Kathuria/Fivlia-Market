@@ -34,7 +34,9 @@ exports.login = async (req, res) => {
     const { mobileNumber, email, fcmToken, password } = req.body;
 
     if (!mobileNumber || !password) {
-      return res.status(400).json({ message: "mobileNumber and password are required" });
+      return res
+        .status(400)
+        .json({ message: "mobileNumber and password are required" });
     }
 
     const user = await User.findOne({ mobileNumber });
@@ -59,7 +61,12 @@ exports.login = async (req, res) => {
 
     return res
       .status(200)
-      .json({ message: "Login Successfully", token, userId: user._id });
+      .json({
+        message: "Login Successfully",
+        token,
+        userId: user._id,
+        userName: user.name,
+      });
   } catch (error) {
     console.error("Error creating store:", error);
     return res
