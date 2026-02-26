@@ -534,8 +534,7 @@ exports.getUserCategoryWiseProducts = async (req, res) => {
 
     const product = await products
       .find(filter)
-      .populate("category")
-      .populate("subCategory")
+      .select("_id name")
       .sort({ createdAt: -1 });
 
     return res.status(200).json({
