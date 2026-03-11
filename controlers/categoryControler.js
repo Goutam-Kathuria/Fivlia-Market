@@ -39,15 +39,23 @@ exports.saveCategory = async (req, res) => {
     let category;
     if (id) {
       // Update
+
+      const updateData = {
+        name,
+        description,
+        attribute,
+        filter,
+        city,
+        status,
+      };
+
       if (image) {
         updateData.image = image;
       }
 
-      category = await Category.findByIdAndUpdate(
-        id,
-        { name, description, attribute, filter, city, status, image },
-        { new: true },
-      );
+      category = await Category.findByIdAndUpdate(id, updateData, {
+        new: true,
+      });
       if (!category)
         return res.status(404).json({ message: "❌ Category not found" });
     } else {
@@ -218,7 +226,7 @@ exports.saveSubEntity = async (req, res) => {
       subcategories: category.subcat,
     });
   } catch (err) {
-    console.error(err)
+    console.error(err);
     res
       .status(500)
       .json({ message: "❌ Failed to save sub-entity", error: err.message });
