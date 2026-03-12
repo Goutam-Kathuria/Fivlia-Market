@@ -7,7 +7,7 @@ const subCategorySchema = new mongoose.Schema({
   city:[{cityId:String,price:Number}],
   attribute:[{type:String}],
   status:{type:Boolean,default:true},
-  commison:Number
+  // commison:Number
 });
 
 const categorySchema = new mongoose.Schema({

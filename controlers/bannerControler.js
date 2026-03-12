@@ -2,6 +2,8 @@ const Banner = require("../modals/banner");
 const User = require("../modals/user");
 const Category = require("../modals/category");
 const BannerPlan = require("../modals/banner_plan");
+const City = require("../modals/city");
+const mongoose = require("mongoose");
 const { getBannersWithinRadius } = require("../utils/location");
 const expireBanner = require("../utils/expireBanner");
 
@@ -66,6 +68,23 @@ const getCategoryIdString = (value) => {
   if (!value) return "";
   if (typeof value === "object" && value._id) return String(value._id);
   return String(value);
+};
+
+const normalizeObjectIdInput = (value) => {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+
+  if (Array.isArray(value)) {
+    if (!value.length) return null;
+    return normalizeObjectIdInput(value[0]);
+  }
+
+  if (typeof value === "object" && value._id !== undefined) {
+    return normalizeObjectIdInput(value._id);
+  }
+
+  const normalized = String(value).trim();
+  return normalized ? normalized : null;
 };
 
 exports.banner = async (req, res) => {
@@ -250,120 +269,182 @@ exports.getBanner = async (req, res) => {
 
 exports.updateBannerStatus = async (req, res) => {
   try {
-    let { id } = req.params;
-    let {
-      status,
-      title,
-      city,
-      zones,
-      type2,
-      address,
-      latitude,
-      longitude,
-      mainCategory,
-      subCategory,
-      subSubCategory,
-      range,
-      brand: brandId,
-      storeId,
-    } = req.body;
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid banner id" });
+    }
 
+    const existingBanner = await Banner.findById(id).select(
+      "aprroveStatus mainCategory",
+    );
+    if (!existingBanner) {
+      return res.status(404).json({ message: "Banner not found" });
+    }
+
+    const updateData = {};
     const rawImagePath = req.files?.image?.[0]?.key;
-    const image = rawImagePath ? `/${rawImagePath}` : "";
+    if (rawImagePath) {
+      updateData.image = `/${rawImagePath}`;
+    }
 
-    const updateData = { status, title, type2 };
+    if (req.body.title !== undefined) {
+      updateData.title = String(req.body.title).trim();
+    }
 
-    if (rawImagePath) updateData.image = image;
-
-    // Handle city
-    if (typeof city === "string") {
-      try {
-        city = JSON.parse(city);
-      } catch (err) {
-        console.log(err);
-        return res.status(400).json({ message: "Invalid city format" });
+    if (req.body.status !== undefined) {
+      const parsedStatus = parseBooleanInput(req.body.status);
+      if (parsedStatus === null) {
+        return res.status(400).json({ message: "Status must be true or false" });
+      }
+      if (parsedStatus !== undefined) {
+        updateData.status = parsedStatus;
       }
     }
 
-    let cityIds = Array.isArray(city) ? city : [city];
+    let cityInput =
+      req.body.cityId !== undefined ? req.body.cityId : req.body.city;
 
-    const cityDoc = await ZoneData.find({ _id: { $in: cityIds } });
-    if (cityDoc) {
-      updateData.city = cityDoc.map((c) => ({ _id: c._id, name: c.city }));
-    }
-
-    if (type2 === "NO") {
-      updateData.mainCategory = null;
-      updateData.subCategory = null;
-      updateData.subSubCategory = null;
-      updateData.brand = null;
-      updateData.storeId = null;
-    }
-
-    if (brandId) {
-      const foundBrand = await brand.findById(brandId).lean();
-      if (!foundBrand)
-        return res.status(204).json({ message: `Brand ${brandId} not found` });
-      updateData.brand = {
-        _id: foundBrand._id,
-        name: foundBrand.brandName,
-      };
-    }
-
-    if (storeId) {
-      const foundStore = await Store.findById(storeId).lean();
-      if (!foundStore)
-        return res.status(204).json({ message: `Store ${storeId} not found` });
-      updateData.storeId = foundStore._id;
-    }
-
-    if (mainCategory) {
-      const foundCategory = await Category.findById(mainCategory).lean();
-      if (!foundCategory) {
-        return res
-          .status(404)
-          .json({ message: `Category ${mainCategory} not found` });
+    if (typeof cityInput === "string") {
+      const trimmed = cityInput.trim();
+      if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          cityInput = Array.isArray(parsed) ? parsed[0] : parsed;
+        } catch (error) {
+          return res.status(400).json({ message: "Invalid cityId format" });
+        }
       }
-      updateData.mainCategory = foundCategory._id;
+    }
 
-      if (subCategory) {
+    if (cityInput !== undefined) {
+      const normalizedCityId = normalizeObjectIdInput(cityInput);
+      if (normalizedCityId === null) {
+        updateData.cityId = null;
+      } else if (!mongoose.Types.ObjectId.isValid(normalizedCityId)) {
+        return res.status(400).json({ message: "Invalid cityId" });
+      } else {
+        const foundCity = await City.findById(normalizedCityId).select("_id");
+        if (!foundCity) {
+          return res
+            .status(404)
+            .json({ message: `City ${normalizedCityId} not found` });
+        }
+        updateData.cityId = foundCity._id;
+      }
+    }
+
+    const isMainCategoryProvided = req.body.mainCategory !== undefined;
+    const isSubCategoryProvided = req.body.subCategory !== undefined;
+    const normalizedMainCategoryId = normalizeObjectIdInput(req.body.mainCategory);
+    const normalizedSubCategoryId = normalizeObjectIdInput(req.body.subCategory);
+
+    let resolvedMainCategoryId = existingBanner.mainCategory
+      ? String(existingBanner.mainCategory)
+      : null;
+    let foundCategory = null;
+
+    if (isMainCategoryProvided) {
+      if (normalizedMainCategoryId === null) {
+        updateData.mainCategory = null;
+        updateData.subCategory = null;
+        resolvedMainCategoryId = null;
+      } else if (!mongoose.Types.ObjectId.isValid(normalizedMainCategoryId)) {
+        return res.status(400).json({ message: "Invalid mainCategory id" });
+      } else {
+        foundCategory = await Category.findById(normalizedMainCategoryId).lean();
+        if (!foundCategory) {
+          return res
+            .status(404)
+            .json({ message: `Category ${normalizedMainCategoryId} not found` });
+        }
+
+        updateData.mainCategory = foundCategory._id;
+        resolvedMainCategoryId = String(foundCategory._id);
+
+        // Prevent stale subCategory when mainCategory changes.
+        if (!isSubCategoryProvided) {
+          updateData.subCategory = null;
+        }
+      }
+    }
+
+    if (isSubCategoryProvided) {
+      if (normalizedSubCategoryId === null) {
+        updateData.subCategory = null;
+      } else {
+        if (!resolvedMainCategoryId) {
+          return res.status(400).json({
+            message: "mainCategory is required to set subCategory",
+          });
+        }
+
+        if (!foundCategory || String(foundCategory._id) !== resolvedMainCategoryId) {
+          foundCategory = await Category.findById(resolvedMainCategoryId).lean();
+        }
+
+        if (!foundCategory) {
+          return res
+            .status(404)
+            .json({ message: `Category ${resolvedMainCategoryId} not found` });
+        }
+
         const foundSubCategory = foundCategory.subcat.find(
-          (sub) => sub._id.toString() === subCategory,
+          (sub) => String(sub._id) === normalizedSubCategoryId,
         );
+
         if (!foundSubCategory) {
           return res
             .status(404)
-            .json({ message: `SubCategory ${subCategory} not found` });
+            .json({ message: `SubCategory ${normalizedSubCategoryId} not found` });
         }
-        updateData.subCategory = foundSubCategory._id;
 
-        if (subSubCategory) {
-          const foundSubSubCategory = foundSubCategory.subsubcat.find(
-            (subsub) => subsub._id.toString() === subSubCategory,
-          );
-          if (!foundSubSubCategory) {
-            return res
-              .status(404)
-              .json({ message: `SubSubCategory ${subSubCategory} not found` });
-          }
-          updateData.subSubCategory = {
-            _id: foundSubSubCategory._id,
-            name: foundSubSubCategory.name,
-          };
-        }
-      } else {
-        updateData.subCategory = null;
+        updateData.subCategory = foundSubCategory._id;
       }
     }
 
-    // Handle zones
-    if (zones) updateData.zones = zones;
+    if (req.body.productId !== undefined) {
+      const normalizedProductId = normalizeObjectIdInput(req.body.productId);
+      if (normalizedProductId === null) {
+        updateData.productId = null;
+      } else if (!mongoose.Types.ObjectId.isValid(normalizedProductId)) {
+        return res.status(400).json({ message: "Invalid productId" });
+      } else {
+        updateData.productId = normalizedProductId;
+      }
+    }
 
-    const existingBanner = await Banner.findById(id).select("aprroveStatus");
-    if (!existingBanner)
-      return res.status(404).json({ message: "Banner not found" });
+    if (req.body.selectedPlanId !== undefined) {
+      const normalizedPlanId = normalizeObjectIdInput(req.body.selectedPlanId);
+      if (normalizedPlanId === null) {
+        return res.status(400).json({ message: "selectedPlanId cannot be empty" });
+      }
+      if (!mongoose.Types.ObjectId.isValid(normalizedPlanId)) {
+        return res.status(400).json({ message: "Invalid selectedPlanId" });
+      }
 
-    // If banner was asked to resubmit or rejected, any update resubmits it
+      const selectedPlan = await BannerPlan.findById(normalizedPlanId).select("_id");
+      if (!selectedPlan) {
+        return res
+          .status(404)
+          .json({ message: `Plan ${normalizedPlanId} not found` });
+      }
+
+      updateData.selectedPlanId = selectedPlan._id;
+    }
+
+    if (req.body.transactionId !== undefined) {
+      const normalizedTransactionId = String(req.body.transactionId || "").trim();
+      if (!normalizedTransactionId) {
+        return res.status(400).json({ message: "transactionId cannot be empty" });
+      }
+      updateData.transactionId = normalizedTransactionId;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ message: "No valid fields provided for update" });
+    }
+
+    // Any change on rejected/resubmit banner sends it back for approval.
     if (
       existingBanner.aprroveStatus === "resubmit" ||
       existingBanner.aprroveStatus === "rejected"
@@ -374,17 +455,9 @@ exports.updateBannerStatus = async (req, res) => {
       updateData.approvedAt = null;
     }
 
-    // Update document
-    const updatedBanner = await Banner.updateOne(
-      { _id: id },
-      { $set: updateData },
-    );
-
-    if (updatedBanner.modifiedCount === 0) {
-      return res
-        .status(404)
-        .json({ message: "No matching banner or data unchanged." });
-    }
+    const updatedBanner = await Banner.findByIdAndUpdate(id, { $set: updateData }, {
+      new: true,
+    });
 
     return res
       .status(200)

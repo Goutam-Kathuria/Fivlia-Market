@@ -28,5 +28,3 @@ const bannerSchema = new mongoose.Schema(
   { timestamps: true },
 );
 module.exports = mongoose.model("Banner", bannerSchema);
-
-//   zones: [{type: {type: String,enum: ['Point'],required: true},coordinates: {type: [Number],required: true},    address: {type: String,required: true}}],

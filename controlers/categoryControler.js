@@ -159,7 +159,7 @@ exports.saveSubEntity = async (req, res) => {
   try {
     const { catId } = req.params;
     const { subId } = req.query;
-    let { name, description, attribute, city, commison, status } = req.body;
+    let { name, description, attribute, city, status } = req.body;
 
     if (typeof city === "string") {
       try {
@@ -196,7 +196,7 @@ exports.saveSubEntity = async (req, res) => {
           name,
           description,
           attribute,
-          commison,
+          // commison,
           city,
           status,
           image,
@@ -217,7 +217,7 @@ exports.saveSubEntity = async (req, res) => {
       image,
       attribute,
       city,
-      commison,
+      // commison,
     });
     await category.save();
 
