@@ -3,12 +3,14 @@ const User = require("../modals/user");
 const Category = require("../modals/category");
 const BannerPlan = require("../modals/banner_plan");
 const City = require("../modals/city");
+const Setting = require("../modals/setting");
 const mongoose = require("mongoose");
 const { getBannersWithinRadius } = require("../utils/location");
 const expireBanner = require("../utils/expireBanner");
 
 const DEFAULT_PLAN_DURATION_DAYS = 30;
 const MILLISECONDS_IN_A_DAY = 24 * 60 * 60 * 1000;
+const DEFAULT_BANNER_RADIUS_KM = 20;
 
 const parseBooleanInput = (value) => {
   if (value === undefined || value === null || value === "") return undefined;
@@ -28,13 +30,23 @@ const parseBooleanInput = (value) => {
   return null;
 };
 
+const parseRadius = (value, fallback = DEFAULT_BANNER_RADIUS_KM) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
 const parseDurationToDays = (durationText) => {
   if (durationText === undefined || durationText === null) {
     return DEFAULT_PLAN_DURATION_DAYS;
   }
 
-  const rawText = String(durationText).trim().toLowerCase();
+  let rawText = String(durationText).trim().toLowerCase();
   if (!rawText) return DEFAULT_PLAN_DURATION_DAYS;
+
+  if (rawText === "monthly") rawText = "1 month";
+  if (rawText === "yearly") rawText = "1 year";
+  if (rawText === "weekly") rawText = "1 week";
+  if (rawText === "daily") rawText = "1 day";
 
   const numberMatch = rawText.match(/(\d+(\.\d+)?)/);
   if (!numberMatch) return DEFAULT_PLAN_DURATION_DAYS;
@@ -87,6 +99,171 @@ const normalizeObjectIdInput = (value) => {
   return normalized ? normalized : null;
 };
 
+const parseCoordinateInput = (value) => {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const isValidLatitude = (value) => value >= -90 && value <= 90;
+const isValidLongitude = (value) => value >= -180 && value <= 180;
+
+const getCoordinateInputsFromBody = (body = {}) => {
+  const latitude = body.latitude !== undefined ? body.latitude : body.lat;
+  const longitude =
+    body.longitude !== undefined
+      ? body.longitude
+      : body.lng !== undefined
+        ? body.lng
+        : body.long;
+
+  return { latitude, longitude };
+};
+
+const buildCoordinateFields = (latitude, longitude) => ({
+  latitude,
+  longitude,
+  lat: String(latitude),
+  long: String(longitude),
+});
+
+const normalizeCityInputValue = (cityInput) => {
+  let value = cityInput;
+
+  if (Array.isArray(value)) {
+    value = value.length ? value[0] : null;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        value = Array.isArray(parsed) ? parsed[0] : parsed;
+      } catch (error) {
+        return { error: { status: 400, message: "Invalid cityId format" } };
+      }
+    } else {
+      value = trimmed;
+    }
+  }
+
+  return { value };
+};
+
+const resolveBannerLocationFields = async ({
+  cityInput,
+  latitudeInput,
+  longitudeInput,
+  requireCoordinates = false,
+}) => {
+  const fields = {};
+  let resolvedCity = null;
+
+  if (cityInput !== undefined) {
+    const normalizedCityInput = normalizeCityInputValue(cityInput);
+    if (normalizedCityInput.error) {
+      return normalizedCityInput;
+    }
+
+    const normalizedCityId = normalizeObjectIdInput(normalizedCityInput.value);
+    if (normalizedCityId === null) {
+      fields.cityId = null;
+    } else if (!mongoose.Types.ObjectId.isValid(normalizedCityId)) {
+      return { error: { status: 400, message: "Invalid cityId" } };
+    } else {
+      resolvedCity = await City.findById(normalizedCityId)
+        .select("_id latitude longitude")
+        .lean();
+      if (!resolvedCity) {
+        return {
+          error: { status: 404, message: `City ${normalizedCityId} not found` },
+        };
+      }
+
+      fields.cityId = resolvedCity._id;
+    }
+  }
+
+  const parsedLatitude = parseCoordinateInput(latitudeInput);
+  const parsedLongitude = parseCoordinateInput(longitudeInput);
+
+  if (parsedLatitude === null || parsedLongitude === null) {
+    return {
+      error: { status: 400, message: "Invalid latitude or longitude value" },
+    };
+  }
+
+  const hasLatitudeInput = parsedLatitude !== undefined;
+  const hasLongitudeInput = parsedLongitude !== undefined;
+
+  if (hasLatitudeInput !== hasLongitudeInput) {
+    return {
+      error: {
+        status: 400,
+        message: "Both latitude and longitude are required together",
+      },
+    };
+  }
+
+  let latitude = hasLatitudeInput ? parsedLatitude : undefined;
+  let longitude = hasLongitudeInput ? parsedLongitude : undefined;
+
+  if ((latitude === undefined || longitude === undefined) && resolvedCity) {
+    const cityLatitude = parseCoordinateInput(resolvedCity.latitude);
+    const cityLongitude = parseCoordinateInput(resolvedCity.longitude);
+
+    if (
+      cityLatitude === undefined ||
+      cityLongitude === undefined ||
+      cityLatitude === null ||
+      cityLongitude === null
+    ) {
+      return {
+        error: {
+          status: 400,
+          message: `City ${resolvedCity._id} does not have valid latitude/longitude`,
+        },
+      };
+    }
+
+    latitude = cityLatitude;
+    longitude = cityLongitude;
+  }
+
+  if (latitude !== undefined && longitude !== undefined) {
+    if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) {
+      return {
+        error: {
+          status: 400,
+          message: "Latitude or longitude is out of valid range",
+        },
+      };
+    }
+
+    Object.assign(fields, buildCoordinateFields(latitude, longitude));
+  }
+
+  if (
+    requireCoordinates &&
+    (fields.latitude === undefined || fields.longitude === undefined)
+  ) {
+    return {
+      error: {
+        status: 400,
+        message:
+          "latitude and longitude are required. You can also provide a cityId with valid coordinates",
+      },
+    };
+  }
+
+  return { fields };
+};
+
 exports.banner = async (req, res) => {
   try {
     const userId = req.user;
@@ -94,11 +271,14 @@ exports.banner = async (req, res) => {
       title,
       mainCategory,
       subCategory,
-      cityId,
       productId,
       selectedPlanId,
       transactionId,
     } = req.body;
+    const cityInput =
+      req.body.cityId !== undefined ? req.body.cityId : req.body.city;
+    const { latitude: latitudeInput, longitude: longitudeInput } =
+      getCoordinateInputsFromBody(req.body);
     const rawImagePath = req.files?.image?.[0]?.key || "";
     const image = rawImagePath ? `/${rawImagePath}` : "";
 
@@ -141,11 +321,24 @@ exports.banner = async (req, res) => {
         .json({ message: `Plan ${selectedPlanId} not found` });
     }
 
+    const locationResolution = await resolveBannerLocationFields({
+      cityInput,
+      latitudeInput,
+      longitudeInput,
+      requireCoordinates: true,
+    });
+
+    if (locationResolution.error) {
+      return res
+        .status(locationResolution.error.status)
+        .json({ message: locationResolution.error.message });
+    }
+
     const newBanner = await Banner.create({
       image,
       title,
       userId,
-      cityId,
+      ...locationResolution.fields,
       selectedPlanId: selectedPlan._id,
       aprroveStatus: "pending",
       approvalReason: "",
@@ -217,15 +410,23 @@ exports.getBanner = async (req, res) => {
 
     // 👉 USER LOCATION
     const user = await User.findById(userId).lean();
+    const userLatitude = parseCoordinateInput(user?.latitude);
+    const userLongitude = parseCoordinateInput(user?.longitude);
 
-    if (!user?.latitude || !user?.longitude) {
+    if (
+      userLatitude === undefined ||
+      userLongitude === undefined ||
+      userLatitude === null ||
+      userLongitude === null
+    ) {
       return res.status(400).json({ message: "User location not found" });
     }
 
     const filters = { aprroveStatus: "active", status: true };
+    const globalSettings = await Setting.findOne().select("radius").lean();
+    const radiusKm = parseRadius(globalSettings?.radius, DEFAULT_BANNER_RADIUS_KM);
 
     const allBanners = await Banner.find(filters)
-      .populate("cityId", "city latitude longitude")
       .populate({
         path: "mainCategory",
         select: "name subcat",
@@ -248,9 +449,10 @@ exports.getBanner = async (req, res) => {
       : bannersWithSubcat;
 
     const matchedBanners = await getBannersWithinRadius(
-      user.latitude,
-      user.longitude,
+      userLatitude,
+      userLongitude,
       categoryMatchedBanners,
+      radiusKm,
     );
 
     return res.status(200).json({
@@ -294,49 +496,43 @@ exports.updateBannerStatus = async (req, res) => {
     if (req.body.status !== undefined) {
       const parsedStatus = parseBooleanInput(req.body.status);
       if (parsedStatus === null) {
-        return res.status(400).json({ message: "Status must be true or false" });
+        return res
+          .status(400)
+          .json({ message: "Status must be true or false" });
       }
       if (parsedStatus !== undefined) {
         updateData.status = parsedStatus;
       }
     }
 
-    let cityInput =
+    const cityInput =
       req.body.cityId !== undefined ? req.body.cityId : req.body.city;
+    const { latitude: latitudeInput, longitude: longitudeInput } =
+      getCoordinateInputsFromBody(req.body);
 
-    if (typeof cityInput === "string") {
-      const trimmed = cityInput.trim();
-      if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-        try {
-          const parsed = JSON.parse(trimmed);
-          cityInput = Array.isArray(parsed) ? parsed[0] : parsed;
-        } catch (error) {
-          return res.status(400).json({ message: "Invalid cityId format" });
-        }
-      }
+    const locationResolution = await resolveBannerLocationFields({
+      cityInput,
+      latitudeInput,
+      longitudeInput,
+      requireCoordinates: false,
+    });
+
+    if (locationResolution.error) {
+      return res
+        .status(locationResolution.error.status)
+        .json({ message: locationResolution.error.message });
     }
 
-    if (cityInput !== undefined) {
-      const normalizedCityId = normalizeObjectIdInput(cityInput);
-      if (normalizedCityId === null) {
-        updateData.cityId = null;
-      } else if (!mongoose.Types.ObjectId.isValid(normalizedCityId)) {
-        return res.status(400).json({ message: "Invalid cityId" });
-      } else {
-        const foundCity = await City.findById(normalizedCityId).select("_id");
-        if (!foundCity) {
-          return res
-            .status(404)
-            .json({ message: `City ${normalizedCityId} not found` });
-        }
-        updateData.cityId = foundCity._id;
-      }
-    }
+    Object.assign(updateData, locationResolution.fields);
 
     const isMainCategoryProvided = req.body.mainCategory !== undefined;
     const isSubCategoryProvided = req.body.subCategory !== undefined;
-    const normalizedMainCategoryId = normalizeObjectIdInput(req.body.mainCategory);
-    const normalizedSubCategoryId = normalizeObjectIdInput(req.body.subCategory);
+    const normalizedMainCategoryId = normalizeObjectIdInput(
+      req.body.mainCategory,
+    );
+    const normalizedSubCategoryId = normalizeObjectIdInput(
+      req.body.subCategory,
+    );
 
     let resolvedMainCategoryId = existingBanner.mainCategory
       ? String(existingBanner.mainCategory)
@@ -351,11 +547,15 @@ exports.updateBannerStatus = async (req, res) => {
       } else if (!mongoose.Types.ObjectId.isValid(normalizedMainCategoryId)) {
         return res.status(400).json({ message: "Invalid mainCategory id" });
       } else {
-        foundCategory = await Category.findById(normalizedMainCategoryId).lean();
+        foundCategory = await Category.findById(
+          normalizedMainCategoryId,
+        ).lean();
         if (!foundCategory) {
           return res
             .status(404)
-            .json({ message: `Category ${normalizedMainCategoryId} not found` });
+            .json({
+              message: `Category ${normalizedMainCategoryId} not found`,
+            });
         }
 
         updateData.mainCategory = foundCategory._id;
@@ -378,8 +578,13 @@ exports.updateBannerStatus = async (req, res) => {
           });
         }
 
-        if (!foundCategory || String(foundCategory._id) !== resolvedMainCategoryId) {
-          foundCategory = await Category.findById(resolvedMainCategoryId).lean();
+        if (
+          !foundCategory ||
+          String(foundCategory._id) !== resolvedMainCategoryId
+        ) {
+          foundCategory = await Category.findById(
+            resolvedMainCategoryId,
+          ).lean();
         }
 
         if (!foundCategory) {
@@ -395,7 +600,9 @@ exports.updateBannerStatus = async (req, res) => {
         if (!foundSubCategory) {
           return res
             .status(404)
-            .json({ message: `SubCategory ${normalizedSubCategoryId} not found` });
+            .json({
+              message: `SubCategory ${normalizedSubCategoryId} not found`,
+            });
         }
 
         updateData.subCategory = foundSubCategory._id;
@@ -416,13 +623,16 @@ exports.updateBannerStatus = async (req, res) => {
     if (req.body.selectedPlanId !== undefined) {
       const normalizedPlanId = normalizeObjectIdInput(req.body.selectedPlanId);
       if (normalizedPlanId === null) {
-        return res.status(400).json({ message: "selectedPlanId cannot be empty" });
+        return res
+          .status(400)
+          .json({ message: "selectedPlanId cannot be empty" });
       }
       if (!mongoose.Types.ObjectId.isValid(normalizedPlanId)) {
         return res.status(400).json({ message: "Invalid selectedPlanId" });
       }
 
-      const selectedPlan = await BannerPlan.findById(normalizedPlanId).select("_id");
+      const selectedPlan =
+        await BannerPlan.findById(normalizedPlanId).select("_id");
       if (!selectedPlan) {
         return res
           .status(404)
@@ -433,15 +643,21 @@ exports.updateBannerStatus = async (req, res) => {
     }
 
     if (req.body.transactionId !== undefined) {
-      const normalizedTransactionId = String(req.body.transactionId || "").trim();
+      const normalizedTransactionId = String(
+        req.body.transactionId || "",
+      ).trim();
       if (!normalizedTransactionId) {
-        return res.status(400).json({ message: "transactionId cannot be empty" });
+        return res
+          .status(400)
+          .json({ message: "transactionId cannot be empty" });
       }
       updateData.transactionId = normalizedTransactionId;
     }
 
     if (Object.keys(updateData).length === 0) {
-      return res.status(400).json({ message: "No valid fields provided for update" });
+      return res
+        .status(400)
+        .json({ message: "No valid fields provided for update" });
     }
 
     // Any change on rejected/resubmit banner sends it back for approval.
@@ -455,9 +671,13 @@ exports.updateBannerStatus = async (req, res) => {
       updateData.approvedAt = null;
     }
 
-    const updatedBanner = await Banner.findByIdAndUpdate(id, { $set: updateData }, {
-      new: true,
-    });
+    const updatedBanner = await Banner.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      {
+        new: true,
+      },
+    );
 
     return res
       .status(200)

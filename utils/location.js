@@ -1,20 +1,54 @@
 require("dotenv").config();
 const haversine = require("haversine-distance");
 
-const getBannersWithinRadius = async (userLat, userLng, banners = []) => {
-  return banners.filter((banner) => {
-    if (!banner.cityId || !banner.cityId.latitude || !banner.cityId.longitude) {
-      return false;
-    }
+const toNumber = (value) => {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
 
-    const userCoord = { lat: userLat, lon: userLng };
-    const bannerCoord = {
-      lat: banner.cityId.latitude,
-      lon: banner.cityId.longitude,
-    };
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const getBannerCoordinates = (banner = {}) => {
+  const latitude = toNumber(
+    banner.latitude !== undefined ? banner.latitude : banner.lat,
+  );
+  const longitude = toNumber(
+    banner.longitude !== undefined ? banner.longitude : banner.long,
+  );
+
+  if (latitude === null || longitude === null) {
+    return null;
+  }
+
+  return {
+    lat: latitude,
+    lon: longitude,
+  };
+};
+
+const getBannersWithinRadius = async (
+  userLat,
+  userLng,
+  banners = [],
+  radiusKm = 20,
+) => {
+  const normalizedUserLat = toNumber(userLat);
+  const normalizedUserLng = toNumber(userLng);
+
+  if (normalizedUserLat === null || normalizedUserLng === null) {
+    return [];
+  }
+
+  const userCoord = { lat: normalizedUserLat, lon: normalizedUserLng };
+
+  return banners.filter((banner) => {
+    const bannerCoord = getBannerCoordinates(banner);
+    if (!bannerCoord) return false;
 
     const distanceKm = haversine(userCoord, bannerCoord) / 1000;
-    return distanceKm <= 20;
+    return distanceKm <= radiusKm;
   });
 };
 

@@ -8,6 +8,10 @@ const bannerSchema = new mongoose.Schema(
     subCategory: { type: mongoose.Schema.Types.ObjectId },
     cityId: { type: mongoose.Schema.Types.ObjectId, ref: "locations" },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    latitude: Number,
+    longitude: Number,
+    lat: String,
+    long: String,
     productId: { type: mongoose.Schema.Types.ObjectId, ref: "product" },
     aprroveStatus: {
       type: String,

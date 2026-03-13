@@ -2,7 +2,15 @@ const products = require("../modals/product");
 const banner = require("../modals/banner");
 const Users = require("../modals/user");
 const Rating = require("../modals/rating");
+const Setting = require("../modals/setting");
 const { applyLocationFilter, getDistanceKm } = require("../utils/location");
+
+const DEFAULT_PRODUCT_RADIUS_KM = 20;
+
+const parseRadius = (value, fallback = DEFAULT_PRODUCT_RADIUS_KM) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
 
 const addDistanceKm = (items, userLat, userLng) => {
   if (!userLat || !userLng) return items;
@@ -98,6 +106,15 @@ exports.getProduct = async (req, res) => {
 
     let userLat;
     let userLng;
+    let radiusKm = DEFAULT_PRODUCT_RADIUS_KM;
+
+    if (isBrowseListing || isCategoryListing || isSearchListing) {
+      const globalSettings = await Setting.findOne().select("radius").lean();
+      radiusKm = parseRadius(
+        globalSettings?.radius,
+        DEFAULT_PRODUCT_RADIUS_KM,
+      );
+    }
 
     if (isBrowseListing) {
       filter.productStatus = "active";
@@ -108,7 +125,7 @@ exports.getProduct = async (req, res) => {
       if (user?.latitude && user?.longitude) {
         userLat = user.latitude;
         userLng = user.longitude;
-        applyLocationFilter(filter, userLat, userLng, 20);
+        applyLocationFilter(filter, userLat, userLng, radiusKm);
       }
     }
 
@@ -126,7 +143,7 @@ exports.getProduct = async (req, res) => {
       userLng = user.longitude;
 
       if (userLat && userLng) {
-        applyLocationFilter(filter, userLat, userLng, 20);
+        applyLocationFilter(filter, userLat, userLng, radiusKm);
       }
     }
 
@@ -149,7 +166,7 @@ exports.getProduct = async (req, res) => {
       userLng = user.longitude;
 
       if (userLat && userLng) {
-        applyLocationFilter(filter, userLat, userLng, 20);
+        applyLocationFilter(filter, userLat, userLng, radiusKm);
       }
     }
 
@@ -371,13 +388,18 @@ exports.getPublicListing = async (req, res) => {
       expiresAt: { $gt: new Date() },
       userId: { $ne: userId },
     };
+    const globalSettings = await Setting.findOne().select("radius").lean();
+    const radiusKm = parseRadius(
+      globalSettings?.radius,
+      DEFAULT_PRODUCT_RADIUS_KM,
+    );
 
     const user = await Users.findById(userId).select("latitude longitude");
     const userLat = user.latitude;
     const userLng = user.longitude;
 
     // 📍 Apply location filter (20 KM)
-    applyLocationFilter(filter, userLat, userLng, 20);
+    applyLocationFilter(filter, userLat, userLng, radiusKm);
 
     const total = await products.countDocuments(filter);
 
