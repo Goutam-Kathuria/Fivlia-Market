@@ -2,8 +2,8 @@ const mongoose = require("mongoose");
 
 const planSchema = new mongoose.Schema(
   {
-  category:{type: mongoose.Schema.Types.ObjectId, ref: "Categories"},
-  city:{type: mongoose.Schema.Types.ObjectId, ref: "locations"},
+  // category:{type: mongoose.Schema.Types.ObjectId, ref: "Categories"},
+  // city:{type: mongoose.Schema.Types.ObjectId, ref: "locations"},
   bannerId:{type: mongoose.Schema.Types.ObjectId, ref: "Banner"},
   amount:{type: Number},
   status:{type:String, enum:['active', 'notActive', 'expired']},

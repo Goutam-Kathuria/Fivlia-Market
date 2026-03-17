@@ -1,273 +1,32 @@
 const Banner = require("../modals/banner");
 const User = require("../modals/user");
 const Category = require("../modals/category");
-const BannerPlan = require("../modals/banner_plan");
-const City = require("../modals/city");
+const BannerPlan = require("../modals/banner_type");
 const Setting = require("../modals/setting");
 const mongoose = require("mongoose");
 const { getBannersWithinRadius } = require("../utils/location");
 const expireBanner = require("../utils/expireBanner");
+const { validateBannerImageSize } = require("../utils/bannerImage");
+const {
+  parseBooleanInput,
+  parseRadius,
+  normalizeObjectIdInput,
+  parseCoordinateInput,
+  getCoordinateInputsFromBody,
+  resolveBannerCoordinates,
+  getCategoryIdString,
+  normalizePlanType,
+  normalizeProductIds,
+  getBannerExpiryDate,
+  attachSubCategory,
+} = require("../utils/bannerHelpers");
 
-const DEFAULT_PLAN_DURATION_DAYS = 30;
-const MILLISECONDS_IN_A_DAY = 24 * 60 * 60 * 1000;
 const DEFAULT_BANNER_RADIUS_KM = 20;
-
-const parseBooleanInput = (value) => {
-  if (value === undefined || value === null || value === "") return undefined;
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") {
-    if (value === 1) return true;
-    if (value === 0) return false;
-    return null;
-  }
-
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === "true" || normalized === "1") return true;
-    if (normalized === "false" || normalized === "0") return false;
-  }
-
-  return null;
-};
-
-const parseRadius = (value, fallback = DEFAULT_BANNER_RADIUS_KM) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-};
-
-const parseDurationToDays = (durationText) => {
-  if (durationText === undefined || durationText === null) {
-    return DEFAULT_PLAN_DURATION_DAYS;
-  }
-
-  let rawText = String(durationText).trim().toLowerCase();
-  if (!rawText) return DEFAULT_PLAN_DURATION_DAYS;
-
-  if (rawText === "monthly") rawText = "1 month";
-  if (rawText === "yearly") rawText = "1 year";
-  if (rawText === "weekly") rawText = "1 week";
-  if (rawText === "daily") rawText = "1 day";
-
-  const numberMatch = rawText.match(/(\d+(\.\d+)?)/);
-  if (!numberMatch) return DEFAULT_PLAN_DURATION_DAYS;
-
-  const amount = Number(numberMatch[1]);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return DEFAULT_PLAN_DURATION_DAYS;
-  }
-
-  let multiplier = null;
-
-  if (/\b(year|years|yr|yrs|y)\b/.test(rawText)) {
-    multiplier = 365;
-  } else if (/\b(month|months|mon|mons|mo)\b/.test(rawText)) {
-    multiplier = 30;
-  } else if (/\b(week|weeks|wk|wks|w)\b/.test(rawText)) {
-    multiplier = 7;
-  } else if (/\b(day|days|dy|d)\b/.test(rawText)) {
-    multiplier = 1;
-  } else if (/^\d+(\.\d+)?$/.test(rawText)) {
-    multiplier = 1;
-  }
-
-  if (!multiplier) return DEFAULT_PLAN_DURATION_DAYS;
-
-  const totalDays = Math.ceil(amount * multiplier);
-  return totalDays > 0 ? totalDays : DEFAULT_PLAN_DURATION_DAYS;
-};
-
-const getCategoryIdString = (value) => {
-  if (!value) return "";
-  if (typeof value === "object" && value._id) return String(value._id);
-  return String(value);
-};
-
-const normalizeObjectIdInput = (value) => {
-  if (value === undefined) return undefined;
-  if (value === null) return null;
-
-  if (Array.isArray(value)) {
-    if (!value.length) return null;
-    return normalizeObjectIdInput(value[0]);
-  }
-
-  if (typeof value === "object" && value._id !== undefined) {
-    return normalizeObjectIdInput(value._id);
-  }
-
-  const normalized = String(value).trim();
-  return normalized ? normalized : null;
-};
-
-const parseCoordinateInput = (value) => {
-  if (value === undefined || value === null || value === "") {
-    return undefined;
-  }
-
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-};
-
-const isValidLatitude = (value) => value >= -90 && value <= 90;
-const isValidLongitude = (value) => value >= -180 && value <= 180;
-
-const getCoordinateInputsFromBody = (body = {}) => {
-  const latitude = body.latitude !== undefined ? body.latitude : body.lat;
-  const longitude =
-    body.longitude !== undefined
-      ? body.longitude
-      : body.lng !== undefined
-        ? body.lng
-        : body.long;
-
-  return { latitude, longitude };
-};
-
-const buildCoordinateFields = (latitude, longitude) => ({
-  latitude,
-  longitude,
-  lat: String(latitude),
-  long: String(longitude),
-});
-
-const normalizeCityInputValue = (cityInput) => {
-  let value = cityInput;
-
-  if (Array.isArray(value)) {
-    value = value.length ? value[0] : null;
-  }
-
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-
-    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        value = Array.isArray(parsed) ? parsed[0] : parsed;
-      } catch (error) {
-        return { error: { status: 400, message: "Invalid cityId format" } };
-      }
-    } else {
-      value = trimmed;
-    }
-  }
-
-  return { value };
-};
-
-const resolveBannerLocationFields = async ({
-  cityInput,
-  latitudeInput,
-  longitudeInput,
-  requireCoordinates = false,
-}) => {
-  const fields = {};
-  let resolvedCity = null;
-
-  if (cityInput !== undefined) {
-    const normalizedCityInput = normalizeCityInputValue(cityInput);
-    if (normalizedCityInput.error) {
-      return normalizedCityInput;
-    }
-
-    const normalizedCityId = normalizeObjectIdInput(normalizedCityInput.value);
-    if (normalizedCityId === null) {
-      fields.cityId = null;
-    } else if (!mongoose.Types.ObjectId.isValid(normalizedCityId)) {
-      return { error: { status: 400, message: "Invalid cityId" } };
-    } else {
-      resolvedCity = await City.findById(normalizedCityId)
-        .select("_id latitude longitude")
-        .lean();
-      if (!resolvedCity) {
-        return {
-          error: { status: 404, message: `City ${normalizedCityId} not found` },
-        };
-      }
-
-      fields.cityId = resolvedCity._id;
-    }
-  }
-
-  const parsedLatitude = parseCoordinateInput(latitudeInput);
-  const parsedLongitude = parseCoordinateInput(longitudeInput);
-
-  if (parsedLatitude === null || parsedLongitude === null) {
-    return {
-      error: { status: 400, message: "Invalid latitude or longitude value" },
-    };
-  }
-
-  const hasLatitudeInput = parsedLatitude !== undefined;
-  const hasLongitudeInput = parsedLongitude !== undefined;
-
-  if (hasLatitudeInput !== hasLongitudeInput) {
-    return {
-      error: {
-        status: 400,
-        message: "Both latitude and longitude are required together",
-      },
-    };
-  }
-
-  let latitude = hasLatitudeInput ? parsedLatitude : undefined;
-  let longitude = hasLongitudeInput ? parsedLongitude : undefined;
-
-  if ((latitude === undefined || longitude === undefined) && resolvedCity) {
-    const cityLatitude = parseCoordinateInput(resolvedCity.latitude);
-    const cityLongitude = parseCoordinateInput(resolvedCity.longitude);
-
-    if (
-      cityLatitude === undefined ||
-      cityLongitude === undefined ||
-      cityLatitude === null ||
-      cityLongitude === null
-    ) {
-      return {
-        error: {
-          status: 400,
-          message: `City ${resolvedCity._id} does not have valid latitude/longitude`,
-        },
-      };
-    }
-
-    latitude = cityLatitude;
-    longitude = cityLongitude;
-  }
-
-  if (latitude !== undefined && longitude !== undefined) {
-    if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) {
-      return {
-        error: {
-          status: 400,
-          message: "Latitude or longitude is out of valid range",
-        },
-      };
-    }
-
-    Object.assign(fields, buildCoordinateFields(latitude, longitude));
-  }
-
-  if (
-    requireCoordinates &&
-    (fields.latitude === undefined || fields.longitude === undefined)
-  ) {
-    return {
-      error: {
-        status: 400,
-        message:
-          "latitude and longitude are required. You can also provide a cityId with valid coordinates",
-      },
-    };
-  }
-
-  return { fields };
-};
 
 exports.banner = async (req, res) => {
   try {
     const userId = req.user;
-    let {
+    const {
       title,
       mainCategory,
       subCategory,
@@ -275,54 +34,93 @@ exports.banner = async (req, res) => {
       selectedPlanId,
       transactionId,
     } = req.body;
-    const cityInput =
-      req.body.cityId !== undefined ? req.body.cityId : req.body.city;
     const { latitude: latitudeInput, longitude: longitudeInput } =
       getCoordinateInputsFromBody(req.body);
     const rawImagePath = req.files?.image?.[0]?.key || "";
     const image = rawImagePath ? `/${rawImagePath}` : "";
 
-    if (!selectedPlanId || String(selectedPlanId).trim() === "") {
+    if (rawImagePath) {
+      const sizeCheck = await validateBannerImageSize({
+        key: rawImagePath,
+        expectedWidth: 1280,
+        expectedHeight: 540,
+      });
+      if (sizeCheck.error) {
+        return res
+          .status(sizeCheck.error.status)
+          .json({ message: sizeCheck.error.message });
+      }
+    }
+
+    const normalizedPlanId = normalizeObjectIdInput(selectedPlanId);
+    if (!normalizedPlanId) {
       return res.status(400).json({ message: "selectedPlanId is required" });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(normalizedPlanId)) {
+      return res.status(400).json({ message: "Invalid selectedPlanId" });
     }
 
     if (!transactionId || String(transactionId).trim() === "") {
       return res.status(400).json({ message: "transactionId is required" });
     }
 
-    if (!mainCategory)
+    if (!mainCategory) {
       return res.status(400).json({ message: "Main category is required" });
-
-    let foundCategory = await Category.findOne({ _id: mainCategory });
-    if (!foundCategory)
-      return res
-        .status(404)
-        .json({ message: `Category ${mainCategory} not found` });
-
-    const hasSubCategory = subCategory && subCategory.trim() !== "";
-    let foundSubCategory = null;
-
-    if (hasSubCategory) {
-      foundSubCategory = foundCategory.subcat.find(
-        (sub) => sub._id.toString() === subCategory,
-      );
-
-      if (!foundSubCategory)
-        return res
-          .status(404)
-          .json({ message: `SubCategory ${subCategory} not found` });
     }
 
-    const selectedPlan =
-      await BannerPlan.findById(selectedPlanId).select("_id");
+    if (!mongoose.Types.ObjectId.isValid(String(mainCategory))) {
+      return res.status(400).json({ message: "Invalid mainCategory id" });
+    }
+
+    if (!subCategory || String(subCategory).trim() === "") {
+      return res.status(400).json({ message: "Sub category is required" });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(String(subCategory))) {
+      return res.status(400).json({ message: "Invalid subCategory id" });
+    }
+
+    const selectedPlan = await BannerPlan.findOne({
+      _id: normalizedPlanId,
+      status: true,
+    })
+      .select("_id type status")
+      .lean();
     if (!selectedPlan) {
       return res
         .status(404)
-        .json({ message: `Plan ${selectedPlanId} not found` });
+        .json({ message: `Plan ${normalizedPlanId} not found or inactive` });
     }
 
-    const locationResolution = await resolveBannerLocationFields({
-      cityInput,
+    const foundCategory = await Category.findOne({ _id: mainCategory });
+    if (!foundCategory) {
+      return res
+        .status(404)
+        .json({ message: `Category ${mainCategory} not found` });
+    }
+
+    const foundSubCategory = foundCategory.subcat.find(
+      (sub) => sub._id.toString() === String(subCategory),
+    );
+
+    if (!foundSubCategory) {
+      return res
+        .status(404)
+        .json({ message: `SubCategory ${subCategory} not found` });
+    }
+
+    const productResolution = normalizeProductIds(productId, {
+      required: true,
+    });
+
+    if (productResolution.error) {
+      return res
+        .status(productResolution.error.status)
+        .json({ message: productResolution.error.message });
+    }
+
+    const locationResolution = resolveBannerCoordinates({
       latitudeInput,
       longitudeInput,
       requireCoordinates: true,
@@ -342,11 +140,11 @@ exports.banner = async (req, res) => {
       selectedPlanId: selectedPlan._id,
       aprroveStatus: "pending",
       approvalReason: "",
-      productId,
+      productId: productResolution.productIds,
       status: false,
       transactionId: String(transactionId).trim(),
-      mainCategory: foundCategory ? foundCategory._id : null,
-      subCategory: foundSubCategory ? foundSubCategory._id : null,
+      mainCategory: foundCategory._id || null,
+      subCategory: foundSubCategory._id || null,
     });
     return res
       .status(200)
@@ -361,33 +159,14 @@ exports.getBanner = async (req, res) => {
   try {
     await expireBanner();
 
-    const { categoryId, myAds } = req.query;
+    const { categoryId, myAds, planType } = req.query;
     const userId = req.user;
+    const normalizedCategoryId = String(categoryId || "").trim();
+    const normalizedPlanType = normalizePlanType(planType);
 
-    const attachSubCategory = (banners) =>
-      banners.map((banner) => {
-        const sub = banner.mainCategory?.subcat?.find(
-          (s) => String(s._id) === String(banner.subCategory),
-        );
-
-        return {
-          ...banner,
-
-          mainCategory: banner.mainCategory
-            ? {
-                _id: banner.mainCategory._id,
-                name: banner.mainCategory.name,
-              }
-            : null,
-
-          subCategory: sub
-            ? {
-                _id: sub._id,
-                name: sub.name,
-              }
-            : null,
-        };
-      });
+    if (planType !== undefined && !normalizedPlanType) {
+      return res.status(400).json({ message: "Invalid plan type" });
+    }
 
     // 👉 MY ADS
     if (myAds !== undefined) {
@@ -396,10 +175,23 @@ exports.getBanner = async (req, res) => {
           path: "mainCategory",
           select: "name subcat",
         })
+        .populate({
+          path: "productId",
+        })
+        .populate({
+          path: "selectedPlanId",
+          select: "type price",
+        })
         .lean()
         .sort({ createdAt: -1 });
 
-      const bannersWithSubcat = attachSubCategory(myBanners);
+      let bannersWithSubcat = attachSubCategory(myBanners);
+
+      if (normalizedPlanType) {
+        bannersWithSubcat = bannersWithSubcat.filter(
+          (banner) => banner.selectedPlanId?.type === normalizedPlanType,
+        );
+      }
 
       return res.status(200).json({
         message: "Banners fetched successfully.",
@@ -431,27 +223,104 @@ exports.getBanner = async (req, res) => {
         path: "mainCategory",
         select: "name subcat",
       })
+      .populate({
+        path: "productId",
+      })
+      .populate({
+        path: "selectedPlanId",
+        select: "type price",
+      })
       .lean()
       .sort({ createdAt: -1 });
 
-    const bannersWithSubcat = attachSubCategory(allBanners);
+    let bannersWithSubcat = attachSubCategory(allBanners);
 
-    const normalizedCategoryId = String(categoryId || "").trim();
+    // Plan type override (if provided)
+    if (normalizedPlanType) {
+      bannersWithSubcat = bannersWithSubcat.filter(
+        (banner) => banner.selectedPlanId?.type === normalizedPlanType,
+      );
 
-    const categoryMatchedBanners = normalizedCategoryId
-      ? bannersWithSubcat.filter((b) => {
-          const mainId = getCategoryIdString(b.mainCategory);
-          const subId = getCategoryIdString(b.subCategory);
-          return (
-            mainId === normalizedCategoryId || subId === normalizedCategoryId
+      if (normalizedCategoryId && normalizedPlanType === "subCategory") {
+        if (!mongoose.Types.ObjectId.isValid(normalizedCategoryId)) {
+          return res.status(400).json({ message: "Invalid categoryId" });
+        }
+
+        const isMainCategory = await Category.findById(normalizedCategoryId)
+          .select("_id")
+          .lean();
+        if (isMainCategory) {
+          bannersWithSubcat = bannersWithSubcat.filter(
+            (banner) => getCategoryIdString(banner.mainCategory) === normalizedCategoryId,
           );
+        } else {
+          const isSubCategory = await Category.findOne({
+            "subcat._id": normalizedCategoryId,
+          })
+            .select("_id")
+            .lean();
+
+          if (!isSubCategory) {
+            return res.status(404).json({ message: "Category not found" });
+          }
+
+          bannersWithSubcat = bannersWithSubcat.filter(
+            (banner) => getCategoryIdString(banner.subCategory) === normalizedCategoryId,
+          );
+        }
+      }
+    } else if (!normalizedCategoryId) {
+      // Home screen: only home banners
+      bannersWithSubcat = bannersWithSubcat.filter(
+        (banner) => banner.selectedPlanId?.type === "home",
+      );
+    } else {
+      // Category screen: home + subCategory banners (filtered by category)
+      if (!mongoose.Types.ObjectId.isValid(normalizedCategoryId)) {
+        return res.status(400).json({ message: "Invalid categoryId" });
+      }
+
+      const isMainCategory = await Category.findById(normalizedCategoryId)
+        .select("_id")
+        .lean();
+
+      let categoryMatched = [];
+
+      if (isMainCategory) {
+        categoryMatched = bannersWithSubcat.filter(
+          (banner) =>
+            banner.selectedPlanId?.type === "subCategory" &&
+            getCategoryIdString(banner.mainCategory) === normalizedCategoryId,
+        );
+      } else {
+        const isSubCategory = await Category.findOne({
+          "subcat._id": normalizedCategoryId,
         })
-      : bannersWithSubcat;
+          .select("_id")
+          .lean();
+
+        if (!isSubCategory) {
+          return res.status(404).json({ message: "Category not found" });
+        }
+
+        categoryMatched = bannersWithSubcat.filter(
+          (banner) =>
+            banner.selectedPlanId?.type === "subCategory" &&
+            getCategoryIdString(banner.subCategory) === normalizedCategoryId,
+        );
+      }
+
+      const homeBanners = bannersWithSubcat.filter(
+        (banner) => banner.selectedPlanId?.type === "home",
+      );
+
+      bannersWithSubcat = [...homeBanners, ...categoryMatched];
+    }
 
     const matchedBanners = await getBannersWithinRadius(
       userLatitude,
       userLongitude,
-      categoryMatchedBanners,
+      bannersWithSubcat,
       radiusKm,
     );
 
@@ -486,6 +355,16 @@ exports.updateBannerStatus = async (req, res) => {
     const updateData = {};
     const rawImagePath = req.files?.image?.[0]?.key;
     if (rawImagePath) {
+      const sizeCheck = await validateBannerImageSize({
+        key: rawImagePath,
+        expectedWidth: 1280,
+        expectedHeight: 540,
+      });
+      if (sizeCheck.error) {
+        return res
+          .status(sizeCheck.error.status)
+          .json({ message: sizeCheck.error.message });
+      }
       updateData.image = `/${rawImagePath}`;
     }
 
@@ -505,13 +384,10 @@ exports.updateBannerStatus = async (req, res) => {
       }
     }
 
-    const cityInput =
-      req.body.cityId !== undefined ? req.body.cityId : req.body.city;
     const { latitude: latitudeInput, longitude: longitudeInput } =
       getCoordinateInputsFromBody(req.body);
 
-    const locationResolution = await resolveBannerLocationFields({
-      cityInput,
+    const locationResolution = resolveBannerCoordinates({
       latitudeInput,
       longitudeInput,
       requireCoordinates: false,
@@ -541,83 +417,78 @@ exports.updateBannerStatus = async (req, res) => {
 
     if (isMainCategoryProvided) {
       if (normalizedMainCategoryId === null) {
-        updateData.mainCategory = null;
-        updateData.subCategory = null;
-        resolvedMainCategoryId = null;
-      } else if (!mongoose.Types.ObjectId.isValid(normalizedMainCategoryId)) {
+        return res
+          .status(400)
+          .json({ message: "mainCategory is required" });
+      }
+
+      if (!mongoose.Types.ObjectId.isValid(normalizedMainCategoryId)) {
         return res.status(400).json({ message: "Invalid mainCategory id" });
-      } else {
-        foundCategory = await Category.findById(
-          normalizedMainCategoryId,
-        ).lean();
-        if (!foundCategory) {
-          return res
-            .status(404)
-            .json({
-              message: `Category ${normalizedMainCategoryId} not found`,
-            });
-        }
+      }
 
-        updateData.mainCategory = foundCategory._id;
-        resolvedMainCategoryId = String(foundCategory._id);
+      foundCategory = await Category.findById(normalizedMainCategoryId).lean();
+      if (!foundCategory) {
+        return res
+          .status(404)
+          .json({ message: `Category ${normalizedMainCategoryId} not found` });
+      }
 
-        // Prevent stale subCategory when mainCategory changes.
-        if (!isSubCategoryProvided) {
-          updateData.subCategory = null;
-        }
+      updateData.mainCategory = foundCategory._id;
+      resolvedMainCategoryId = String(foundCategory._id);
+
+      if (!isSubCategoryProvided) {
+        return res.status(400).json({
+          message: "subCategory is required when mainCategory is updated",
+        });
       }
     }
 
     if (isSubCategoryProvided) {
       if (normalizedSubCategoryId === null) {
-        updateData.subCategory = null;
-      } else {
-        if (!resolvedMainCategoryId) {
-          return res.status(400).json({
-            message: "mainCategory is required to set subCategory",
-          });
-        }
-
-        if (
-          !foundCategory ||
-          String(foundCategory._id) !== resolvedMainCategoryId
-        ) {
-          foundCategory = await Category.findById(
-            resolvedMainCategoryId,
-          ).lean();
-        }
-
-        if (!foundCategory) {
-          return res
-            .status(404)
-            .json({ message: `Category ${resolvedMainCategoryId} not found` });
-        }
-
-        const foundSubCategory = foundCategory.subcat.find(
-          (sub) => String(sub._id) === normalizedSubCategoryId,
-        );
-
-        if (!foundSubCategory) {
-          return res
-            .status(404)
-            .json({
-              message: `SubCategory ${normalizedSubCategoryId} not found`,
-            });
-        }
-
-        updateData.subCategory = foundSubCategory._id;
+        return res.status(400).json({ message: "subCategory is required" });
       }
+
+      if (!resolvedMainCategoryId) {
+        return res.status(400).json({
+          message: "mainCategory is required to set subCategory",
+        });
+      }
+
+      if (!foundCategory || String(foundCategory._id) !== resolvedMainCategoryId) {
+        foundCategory = await Category.findById(resolvedMainCategoryId).lean();
+      }
+
+      if (!foundCategory) {
+        return res
+          .status(404)
+          .json({ message: `Category ${resolvedMainCategoryId} not found` });
+      }
+
+      const foundSubCategory = foundCategory.subcat.find(
+        (sub) => String(sub._id) === normalizedSubCategoryId,
+      );
+
+      if (!foundSubCategory) {
+        return res
+          .status(404)
+          .json({ message: `SubCategory ${normalizedSubCategoryId} not found` });
+      }
+
+      updateData.subCategory = foundSubCategory._id;
     }
 
     if (req.body.productId !== undefined) {
-      const normalizedProductId = normalizeObjectIdInput(req.body.productId);
-      if (normalizedProductId === null) {
-        updateData.productId = null;
-      } else if (!mongoose.Types.ObjectId.isValid(normalizedProductId)) {
-        return res.status(400).json({ message: "Invalid productId" });
-      } else {
-        updateData.productId = normalizedProductId;
+      const productResolution = normalizeProductIds(req.body.productId, {
+        required: true,
+      });
+
+      if (productResolution.error) {
+        return res
+          .status(productResolution.error.status)
+          .json({ message: productResolution.error.message });
       }
+
+      updateData.productId = productResolution.productIds;
     }
 
     if (req.body.selectedPlanId !== undefined) {
@@ -631,12 +502,16 @@ exports.updateBannerStatus = async (req, res) => {
         return res.status(400).json({ message: "Invalid selectedPlanId" });
       }
 
-      const selectedPlan =
-        await BannerPlan.findById(normalizedPlanId).select("_id");
+      const selectedPlan = await BannerPlan.findOne({
+        _id: normalizedPlanId,
+        status: true,
+      })
+        .select("_id")
+        .lean();
       if (!selectedPlan) {
         return res
           .status(404)
-          .json({ message: `Plan ${normalizedPlanId} not found` });
+          .json({ message: `Plan ${normalizedPlanId} not found or inactive` });
       }
 
       updateData.selectedPlanId = selectedPlan._id;
@@ -724,7 +599,7 @@ exports.getAllBanner = async (req, res) => {
       // Plan details
       .populate({
         path: "selectedPlanId",
-        select: "duration price",
+        select: "type price",
       });
 
     return res.json(banners);
@@ -754,36 +629,28 @@ exports.updateBannerApproval = async (req, res) => {
     const updateData = { aprroveStatus };
 
     if (aprroveStatus === "active") {
-      let selectedPlan = null;
-
-      if (existingBanner.selectedPlanId) {
-        selectedPlan = await BannerPlan.findOne({
-          _id: existingBanner.selectedPlanId,
-          status: true,
-        })
-          .select("_id duration")
-          .lean();
+      if (!existingBanner.selectedPlanId) {
+        return res.status(400).json({ message: "selectedPlanId is required" });
       }
 
-      if (!selectedPlan) {
-        selectedPlan = await BannerPlan.findOne({ status: true })
-          .sort({ price: 1, createdAt: -1 })
-          .select("_id duration")
-          .lean();
-      }
+      const selectedPlan = await BannerPlan.findById(
+        existingBanner.selectedPlanId,
+      )
+        .select("_id status")
+        .lean();
 
       if (!selectedPlan) {
-        return res.status(400).json({
-          message:
-            "No active banner plan found. Add at least one active plan first.",
+        return res.status(404).json({
+          message: `Plan ${existingBanner.selectedPlanId} not found`,
         });
       }
 
+      if (!selectedPlan.status) {
+        return res.status(400).json({ message: "Banner plan is inactive" });
+      }
+
       const now = new Date();
-      const durationDays = parseDurationToDays(selectedPlan.duration);
-      const toDate = new Date(
-        now.getTime() + durationDays * MILLISECONDS_IN_A_DAY,
-      );
+      const toDate = getBannerExpiryDate(now);
 
       updateData.status = true;
       updateData.approvalReason = "";
@@ -834,10 +701,11 @@ exports.updateBannerApproval = async (req, res) => {
 
 exports.addPlans = async (req, res) => {
   try {
-    const { duration, price, status } = req.body;
+    const { type, price, status } = req.body;
 
-    if (!duration || String(duration).trim() === "") {
-      return res.status(400).json({ message: "Duration is required" });
+    const normalizedType = normalizePlanType(type);
+    if (!normalizedType) {
+      return res.status(400).json({ message: "Valid plan type is required" });
     }
 
     const parsedPrice = Number(price);
@@ -851,7 +719,7 @@ exports.addPlans = async (req, res) => {
     }
 
     const payload = {
-      duration: String(duration).trim(),
+      type: normalizedType,
       price: parsedPrice,
     };
 
@@ -903,8 +771,12 @@ exports.editPlans = async (req, res) => {
 
     const update = {};
 
-    if (req.body.duration !== undefined) {
-      update.duration = String(req.body.duration).trim();
+    if (req.body.type !== undefined) {
+      const normalizedType = normalizePlanType(req.body.type);
+      if (!normalizedType) {
+        return res.status(400).json({ message: "Invalid plan type" });
+      }
+      update.type = normalizedType;
     }
 
     if (req.body.price !== undefined) {
@@ -916,11 +788,11 @@ exports.editPlans = async (req, res) => {
     }
 
     if (req.body.status !== undefined) {
-      update.status =
-        req.body.status === true ||
-        req.body.status === "true" ||
-        req.body.status === 1 ||
-        req.body.status === "1";
+      const parsedStatus = parseBooleanInput(req.body.status);
+      if (parsedStatus === null) {
+        return res.status(400).json({ message: "Status must be true or false" });
+      }
+      update.status = parsedStatus;
     }
 
     if (!Object.keys(update).length) {
