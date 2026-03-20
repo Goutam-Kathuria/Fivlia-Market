@@ -28,6 +28,8 @@ const {
   adminSetting,
   adminLogin,
   getAdminSetting,
+  getAppSetting,
+  getAdminDashboard,
   createNotification,
   editNotification,
   getNotifications,
@@ -110,9 +112,11 @@ router.post("/edit-elans/:planId", editPlans);
 router.get("/getPlans", getPlans);
 
 router.get("/getBanner", verifyToken, getBanner);
-router.get("/get-all-banner", getAllBanner);
+router.get("/get-all-banner", verifyAdminToken, getAllBanner);
 
 router.get("/admin/get-setting", getAdminSetting);
+router.get("/admin/dashboard", verifyAdminToken, getAdminDashboard);
+router.get("/get-app-setting", getAppSetting);
 
 router.post("/create-notification", upload, createNotification);
 router.post("/edit-notification/:id", upload, editNotification);

@@ -7,6 +7,7 @@ const mongoose = require("mongoose");
 const { getBannersWithinRadius } = require("../utils/location");
 const expireBanner = require("../utils/expireBanner");
 const { validateBannerImageSize } = require("../utils/bannerImage");
+const { recordBannerEarning, attachBannerEarnings } = require("../utils/bannerEarnings");
 const {
   parseBooleanInput,
   parseRadius,
@@ -85,7 +86,7 @@ exports.banner = async (req, res) => {
       _id: normalizedPlanId,
       status: true,
     })
-      .select("_id type status")
+      .select("_id type status price")
       .lean();
     if (!selectedPlan) {
       return res
@@ -145,6 +146,13 @@ exports.banner = async (req, res) => {
       transactionId: String(transactionId).trim(),
       mainCategory: foundCategory._id || null,
       subCategory: foundSubCategory._id || null,
+    });
+
+    await recordBannerEarning({
+      transactionId,
+      userId,
+      bannerId: newBanner._id,
+      selectedPlan,
     });
     return res
       .status(200)
@@ -584,12 +592,6 @@ exports.getAllBanner = async (req, res) => {
         select: "name",
       })
 
-      // City name only
-      .populate({
-        path: "cityId",
-        select: "city",
-      })
-
       // User name + mobile only
       .populate({
         path: "userId",
@@ -600,9 +602,12 @@ exports.getAllBanner = async (req, res) => {
       .populate({
         path: "selectedPlanId",
         select: "type price",
-      });
+      })
+      .lean();
 
-    return res.json(banners);
+    const bannersWithEarnings = await attachBannerEarnings(banners);
+
+    return res.json(bannersWithEarnings);
   } catch (error) {
     console.error(error);
     return res.status(500).json({

@@ -3,6 +3,7 @@ const banner = require("../modals/banner");
 const Users = require("../modals/user");
 const Rating = require("../modals/rating");
 const Setting = require("../modals/setting");
+const Earning = require("../modals/earning");
 const { applyLocationFilter, getDistanceKm } = require("../utils/location");
 
 const DEFAULT_PRODUCT_RADIUS_KM = 20;
@@ -68,6 +69,31 @@ exports.addProduct = async (req, res) => {
       userId,
       image,
     });
+
+    if (paymentType === "paid") {
+      const normalizedTransactionId = String(transactionId || "").trim();
+      const settings = await Setting.findOne().select("productPrice").lean();
+      let amount = Number(settings?.productPrice ?? 0);
+      if (!Number.isFinite(amount) || amount < 0) amount = 0;
+
+      try {
+        await Earning.create({
+          sourceType: "product",
+          amount,
+          transactionId: normalizedTransactionId,
+          userId,
+          referenceModel: "product",
+          referenceId: newProduct._id,
+          meta: {
+            productType: productType ?? null,
+          },
+        });
+      } catch (earningError) {
+        if (earningError?.code !== 11000) {
+          console.error("Failed to record product earning:", earningError);
+        }
+      }
+    }
     return res
       .status(200)
       .json({ message: "Product Added Successfully", newProduct });
@@ -128,6 +154,7 @@ exports.getProduct = async (req, res) => {
     if (isBrowseListing) {
       filter.productStatus = "active";
       filter.expiresAt = { $gt: new Date() };
+      filter.paymentType = "paid";
       filter.userId = { $ne: userId };
       const user = await Users.findById(userId).select("latitude longitude");
 
