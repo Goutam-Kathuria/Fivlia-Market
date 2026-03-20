@@ -40,12 +40,19 @@ exports.addProduct = async (req, res) => {
       price,
       address,
       productType,
+      paymentType,
+      transactionId
     } = req.body;
     const image =
       `/${req.files?.MultipleImage?.[0]?.key}` || req.body.MultipleImage || "";
     category = category || null;
     subCategory = subCategory || null;
     userId = userId || null;
+
+    if(paymentType === "paid" && !transactionId){
+      return res.status(400).json({ message: "Transaction ID is required for paid products" });
+    }
+    
     const newProduct = await products.create({
       name,
       description,
@@ -54,6 +61,8 @@ exports.addProduct = async (req, res) => {
       price,
       address,
       productType,
+      paymentType,
+      transactionId,
       latitude,
       longitude,
       userId,

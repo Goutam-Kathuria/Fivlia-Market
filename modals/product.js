@@ -17,6 +17,8 @@ const productSchema = new mongoose.Schema(
       default: "pending",
       enum: ["pending", "rejected", "active", "sold", "expired"],
     },
+    paymentType:{ type: String, enum: ["free", "paid"] },
+    transactionId: String,
     rating: { type: Number, default: 0 }, // average rating
     ratingCount: { type: Number, default: 0 },
     ratingSum: { type: Number, default: 0 },

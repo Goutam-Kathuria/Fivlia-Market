@@ -7,7 +7,8 @@ const settingSchemma = new mongoose.Schema(
     name:String,
     email:String,
     password:String,
-    image:String
+    image:String,
+    productPrice:Number,
   },
   { timestamps: true }
 );
