@@ -2,6 +2,8 @@ const mongoose = require("mongoose");
 
 const DEFAULT_BANNER_DURATION_DAYS = 30;
 const MILLISECONDS_IN_A_DAY = 24 * 60 * 60 * 1000;
+const HOME_BANNER_PLAN_TYPE = "Home Banner";
+const CATEGORY_BANNER_PLAN_TYPE = "Category Banner";
 
 const parseBooleanInput = (value) => {
   if (value === undefined || value === null || value === "") return undefined;
@@ -158,18 +160,38 @@ const normalizePlanType = (value) => {
   if (!raw) return null;
 
   const lowered = raw.toLowerCase();
-  if (lowered === "home") return "home";
   if (
+    lowered === "home" ||
+    lowered === "home banner" ||
+    lowered === "home-banner" ||
+    lowered === "home_banner" ||
+    lowered === "homebanner"
+  ) {
+    return HOME_BANNER_PLAN_TYPE;
+  }
+
+  if (
+    lowered === "category" ||
+    lowered === "category banner" ||
+    lowered === "category-banner" ||
+    lowered === "category_banner" ||
+    lowered === "categorybanner" ||
     lowered === "subcategory" ||
     lowered === "sub-category" ||
     lowered === "sub_category" ||
     lowered === "subcat"
   ) {
-    return "subCategory";
+    return CATEGORY_BANNER_PLAN_TYPE;
   }
 
   return null;
 };
+
+const isHomeBannerPlanType = (value) =>
+  normalizePlanType(value) === HOME_BANNER_PLAN_TYPE;
+
+const isCategoryBannerPlanType = (value) =>
+  normalizePlanType(value) === CATEGORY_BANNER_PLAN_TYPE;
 
 const normalizeArrayInput = (value) => {
   if (value === undefined || value === null || value === "") return [];
@@ -240,6 +262,8 @@ const getBannerExpiryDate = (fromDate = new Date()) =>
 
 module.exports = {
   DEFAULT_BANNER_DURATION_DAYS,
+  HOME_BANNER_PLAN_TYPE,
+  CATEGORY_BANNER_PLAN_TYPE,
   parseBooleanInput,
   parseRadius,
   normalizeObjectIdInput,
@@ -248,6 +272,8 @@ module.exports = {
   resolveBannerCoordinates,
   getCategoryIdString,
   normalizePlanType,
+  isHomeBannerPlanType,
+  isCategoryBannerPlanType,
   normalizeProductIds,
   getBannerExpiryDate,
   attachSubCategory,

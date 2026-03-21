@@ -9,14 +9,16 @@ const expireBanner = require("../utils/expireBanner");
 const { validateBannerImageSize } = require("../utils/bannerImage");
 const { recordBannerEarning, attachBannerEarnings } = require("../utils/bannerEarnings");
 const {
+  CATEGORY_BANNER_PLAN_TYPE,
   parseBooleanInput,
   parseRadius,
   normalizeObjectIdInput,
   parseCoordinateInput,
   getCoordinateInputsFromBody,
   resolveBannerCoordinates,
-  getCategoryIdString,
   normalizePlanType,
+  isHomeBannerPlanType,
+  isCategoryBannerPlanType,
   normalizeProductIds,
   getBannerExpiryDate,
   attachSubCategory,
@@ -66,22 +68,6 @@ exports.banner = async (req, res) => {
       return res.status(400).json({ message: "transactionId is required" });
     }
 
-    if (!mainCategory) {
-      return res.status(400).json({ message: "Main category is required" });
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(String(mainCategory))) {
-      return res.status(400).json({ message: "Invalid mainCategory id" });
-    }
-
-    if (!subCategory || String(subCategory).trim() === "") {
-      return res.status(400).json({ message: "Sub category is required" });
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(String(subCategory))) {
-      return res.status(400).json({ message: "Invalid subCategory id" });
-    }
-
     const selectedPlan = await BannerPlan.findOne({
       _id: normalizedPlanId,
       status: true,
@@ -94,21 +80,43 @@ exports.banner = async (req, res) => {
         .json({ message: `Plan ${normalizedPlanId} not found or inactive` });
     }
 
-    const foundCategory = await Category.findOne({ _id: mainCategory });
-    if (!foundCategory) {
-      return res
-        .status(404)
-        .json({ message: `Category ${mainCategory} not found` });
-    }
+    const requiresCategory = isCategoryBannerPlanType(selectedPlan.type);
+    let foundCategory = null;
+    let foundSubCategory = null;
 
-    const foundSubCategory = foundCategory.subcat.find(
-      (sub) => sub._id.toString() === String(subCategory),
-    );
+    if (requiresCategory) {
+      if (!mainCategory) {
+        return res.status(400).json({ message: "Main category is required" });
+      }
 
-    if (!foundSubCategory) {
-      return res
-        .status(404)
-        .json({ message: `SubCategory ${subCategory} not found` });
+      if (!mongoose.Types.ObjectId.isValid(String(mainCategory))) {
+        return res.status(400).json({ message: "Invalid mainCategory id" });
+      }
+
+      if (!subCategory || String(subCategory).trim() === "") {
+        return res.status(400).json({ message: "Sub category is required" });
+      }
+
+      if (!mongoose.Types.ObjectId.isValid(String(subCategory))) {
+        return res.status(400).json({ message: "Invalid subCategory id" });
+      }
+
+      foundCategory = await Category.findOne({ _id: mainCategory });
+      if (!foundCategory) {
+        return res
+          .status(404)
+          .json({ message: `Category ${mainCategory} not found` });
+      }
+
+      foundSubCategory = foundCategory.subcat.find(
+        (sub) => sub._id.toString() === String(subCategory),
+      );
+
+      if (!foundSubCategory) {
+        return res
+          .status(404)
+          .json({ message: `SubCategory ${subCategory} not found` });
+      }
     }
 
     const productResolution = normalizeProductIds(productId, {
@@ -144,8 +152,8 @@ exports.banner = async (req, res) => {
       productId: productResolution.productIds,
       status: false,
       transactionId: String(transactionId).trim(),
-      mainCategory: foundCategory._id || null,
-      subCategory: foundSubCategory._id || null,
+      mainCategory: foundCategory?._id || null,
+      subCategory: foundSubCategory?._id || null,
     });
 
     await recordBannerEarning({
@@ -167,14 +175,8 @@ exports.getBanner = async (req, res) => {
   try {
     await expireBanner();
 
-    const { categoryId, myAds, planType } = req.query;
+    const { categoryId, myAds } = req.query;
     const userId = req.user;
-    const normalizedCategoryId = String(categoryId || "").trim();
-    const normalizedPlanType = normalizePlanType(planType);
-
-    if (planType !== undefined && !normalizedPlanType) {
-      return res.status(400).json({ message: "Invalid plan type" });
-    }
 
     // 👉 MY ADS
     if (myAds !== undefined) {
@@ -193,13 +195,7 @@ exports.getBanner = async (req, res) => {
         .lean()
         .sort({ createdAt: -1 });
 
-      let bannersWithSubcat = attachSubCategory(myBanners);
-
-      if (normalizedPlanType) {
-        bannersWithSubcat = bannersWithSubcat.filter(
-          (banner) => banner.selectedPlanId?.type === normalizedPlanType,
-        );
-      }
+      const bannersWithSubcat = attachSubCategory(myBanners);
 
       return res.status(200).json({
         message: "Banners fetched successfully.",
@@ -241,49 +237,17 @@ exports.getBanner = async (req, res) => {
       .lean()
       .sort({ createdAt: -1 });
 
+    console.log(`Fetched ${allBanners.length} active banners from DB`);
     let bannersWithSubcat = attachSubCategory(allBanners);
 
-    // Plan type override (if provided)
-    if (normalizedPlanType) {
+    const normalizedCategoryId = String(categoryId || "").trim();
+
+    // Home screen returns only home banners.
+    if (!normalizedCategoryId) {
       bannersWithSubcat = bannersWithSubcat.filter(
-        (banner) => banner.selectedPlanId?.type === normalizedPlanType,
-      );
-
-      if (normalizedCategoryId && normalizedPlanType === "subCategory") {
-        if (!mongoose.Types.ObjectId.isValid(normalizedCategoryId)) {
-          return res.status(400).json({ message: "Invalid categoryId" });
-        }
-
-        const isMainCategory = await Category.findById(normalizedCategoryId)
-          .select("_id")
-          .lean();
-        if (isMainCategory) {
-          bannersWithSubcat = bannersWithSubcat.filter(
-            (banner) => getCategoryIdString(banner.mainCategory) === normalizedCategoryId,
-          );
-        } else {
-          const isSubCategory = await Category.findOne({
-            "subcat._id": normalizedCategoryId,
-          })
-            .select("_id")
-            .lean();
-
-          if (!isSubCategory) {
-            return res.status(404).json({ message: "Category not found" });
-          }
-
-          bannersWithSubcat = bannersWithSubcat.filter(
-            (banner) => getCategoryIdString(banner.subCategory) === normalizedCategoryId,
-          );
-        }
-      }
-    } else if (!normalizedCategoryId) {
-      // Home screen: only home banners
-      bannersWithSubcat = bannersWithSubcat.filter(
-        (banner) => banner.selectedPlanId?.type === "home",
+        (banner) => isHomeBannerPlanType(banner.selectedPlanId?.type),
       );
     } else {
-      // Category screen: home + subCategory banners (filtered by category)
       if (!mongoose.Types.ObjectId.isValid(normalizedCategoryId)) {
         return res.status(400).json({ message: "Invalid categoryId" });
       }
@@ -292,13 +256,17 @@ exports.getBanner = async (req, res) => {
         .select("_id")
         .lean();
 
+      const homeBanners = bannersWithSubcat.filter(
+        (banner) => isHomeBannerPlanType(banner.selectedPlanId?.type),
+      );
+
       let categoryMatched = [];
 
       if (isMainCategory) {
         categoryMatched = bannersWithSubcat.filter(
           (banner) =>
-            banner.selectedPlanId?.type === "subCategory" &&
-            getCategoryIdString(banner.mainCategory) === normalizedCategoryId,
+            String(banner.mainCategory?._id || banner.mainCategory) ===
+              normalizedCategoryId,
         );
       } else {
         const isSubCategory = await Category.findOne({
@@ -313,18 +281,19 @@ exports.getBanner = async (req, res) => {
 
         categoryMatched = bannersWithSubcat.filter(
           (banner) =>
-            banner.selectedPlanId?.type === "subCategory" &&
-            getCategoryIdString(banner.subCategory) === normalizedCategoryId,
+            String(banner.subCategory?._id || banner.subCategory) ===
+              normalizedCategoryId,
         );
       }
 
-      const homeBanners = bannersWithSubcat.filter(
-        (banner) => banner.selectedPlanId?.type === "home",
-      );
-
-      bannersWithSubcat = [...homeBanners, ...categoryMatched];
+      const seenBannerIds = new Set();
+      bannersWithSubcat = [...homeBanners, ...categoryMatched].filter((banner) => {
+        const bannerId = String(banner._id);
+        if (seenBannerIds.has(bannerId)) return false;
+        seenBannerIds.add(bannerId);
+        return true;
+      });
     }
-
     const matchedBanners = await getBannersWithinRadius(
       userLatitude,
       userLongitude,
@@ -354,7 +323,7 @@ exports.updateBannerStatus = async (req, res) => {
     }
 
     const existingBanner = await Banner.findById(id).select(
-      "aprroveStatus mainCategory",
+      "aprroveStatus mainCategory subCategory selectedPlanId",
     );
     if (!existingBanner) {
       return res.status(404).json({ message: "Banner not found" });
@@ -409,6 +378,39 @@ exports.updateBannerStatus = async (req, res) => {
 
     Object.assign(updateData, locationResolution.fields);
 
+    let selectedPlan = null;
+    if (req.body.selectedPlanId !== undefined) {
+      const normalizedPlanId = normalizeObjectIdInput(req.body.selectedPlanId);
+      if (normalizedPlanId === null) {
+        return res
+          .status(400)
+          .json({ message: "selectedPlanId cannot be empty" });
+      }
+      if (!mongoose.Types.ObjectId.isValid(normalizedPlanId)) {
+        return res.status(400).json({ message: "Invalid selectedPlanId" });
+      }
+
+      const resolvedSelectedPlan = await BannerPlan.findOne({
+        _id: normalizedPlanId,
+        status: true,
+      })
+        .select("_id type")
+        .lean();
+      if (!resolvedSelectedPlan) {
+        return res
+          .status(404)
+          .json({ message: `Plan ${normalizedPlanId} not found or inactive` });
+      }
+
+      updateData.selectedPlanId = resolvedSelectedPlan._id;
+      selectedPlan = resolvedSelectedPlan;
+    } else if (existingBanner.selectedPlanId) {
+      selectedPlan = await BannerPlan.findById(existingBanner.selectedPlanId)
+        .select("_id type")
+        .lean();
+    }
+
+    const requiresCategory = isCategoryBannerPlanType(selectedPlan?.type);
     const isMainCategoryProvided = req.body.mainCategory !== undefined;
     const isSubCategoryProvided = req.body.subCategory !== undefined;
     const normalizedMainCategoryId = normalizeObjectIdInput(
@@ -421,7 +423,17 @@ exports.updateBannerStatus = async (req, res) => {
     let resolvedMainCategoryId = existingBanner.mainCategory
       ? String(existingBanner.mainCategory)
       : null;
+    let resolvedSubCategoryId = existingBanner.subCategory
+      ? String(existingBanner.subCategory)
+      : null;
     let foundCategory = null;
+
+    if (!requiresCategory && req.body.selectedPlanId !== undefined) {
+      updateData.mainCategory = null;
+      updateData.subCategory = null;
+      resolvedMainCategoryId = null;
+      resolvedSubCategoryId = null;
+    }
 
     if (isMainCategoryProvided) {
       if (normalizedMainCategoryId === null) {
@@ -444,7 +456,7 @@ exports.updateBannerStatus = async (req, res) => {
       updateData.mainCategory = foundCategory._id;
       resolvedMainCategoryId = String(foundCategory._id);
 
-      if (!isSubCategoryProvided) {
+      if (requiresCategory && !isSubCategoryProvided) {
         return res.status(400).json({
           message: "subCategory is required when mainCategory is updated",
         });
@@ -483,6 +495,21 @@ exports.updateBannerStatus = async (req, res) => {
       }
 
       updateData.subCategory = foundSubCategory._id;
+      resolvedSubCategoryId = String(foundSubCategory._id);
+    }
+
+    if (requiresCategory) {
+      if (!resolvedMainCategoryId) {
+        return res.status(400).json({
+          message: `${CATEGORY_BANNER_PLAN_TYPE} requires mainCategory`,
+        });
+      }
+
+      if (!resolvedSubCategoryId) {
+        return res.status(400).json({
+          message: `${CATEGORY_BANNER_PLAN_TYPE} requires subCategory`,
+        });
+      }
     }
 
     if (req.body.productId !== undefined) {
@@ -497,32 +524,6 @@ exports.updateBannerStatus = async (req, res) => {
       }
 
       updateData.productId = productResolution.productIds;
-    }
-
-    if (req.body.selectedPlanId !== undefined) {
-      const normalizedPlanId = normalizeObjectIdInput(req.body.selectedPlanId);
-      if (normalizedPlanId === null) {
-        return res
-          .status(400)
-          .json({ message: "selectedPlanId cannot be empty" });
-      }
-      if (!mongoose.Types.ObjectId.isValid(normalizedPlanId)) {
-        return res.status(400).json({ message: "Invalid selectedPlanId" });
-      }
-
-      const selectedPlan = await BannerPlan.findOne({
-        _id: normalizedPlanId,
-        status: true,
-      })
-        .select("_id")
-        .lean();
-      if (!selectedPlan) {
-        return res
-          .status(404)
-          .json({ message: `Plan ${normalizedPlanId} not found or inactive` });
-      }
-
-      updateData.selectedPlanId = selectedPlan._id;
     }
 
     if (req.body.transactionId !== undefined) {
