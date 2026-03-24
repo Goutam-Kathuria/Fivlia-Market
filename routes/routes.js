@@ -57,6 +57,7 @@ const {
   rateProduct,
   deleteProduct,
   getUserCategoryWiseProducts,
+  getUserProducts,
 } = require("../controlers/productControler");
 
 router.post("/register", register);
@@ -100,6 +101,7 @@ router.post("/edit-product/:productId", upload, editProduct);
 router.post("/repost-product/:productId", upload, repostProduct);
 router.get("/get-product-for-approvals", verifyAdminToken, getProductForApprovals);
 router.get("/get-user-category-wise-products", verifyToken, getUserCategoryWiseProducts);
+router.get("/get-user-products/:bannerId", getUserProducts);
 router.post("/rate-product/:productId", verifyToken, rateProduct);
 router.delete("/delete-product/:productId", verifyToken, deleteProduct);
 // ---------------- BANNER ROUTES ----------------

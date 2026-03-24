@@ -607,3 +607,32 @@ exports.getUserCategoryWiseProducts = async (req, res) => {
     });
   }
 };
+
+exports.getUserProducts = async (req, res) => {
+  try {
+    const {bannerId} = req.params
+
+    const Banner = await banner.findById(bannerId);
+    if (!Banner) {
+      return res.status(404).json({ message: "Banner not found" });
+    }
+
+    console.log("Banner found:", Banner);
+
+    const productsList = await products
+      .find({ _id: { $in: Banner.productId }, productStatus: "active" })
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      message: "Products fetched successfully",
+      productsList,
+    });
+    
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "Failed to fetch products",
+      error: error.message,
+    });
+  }
+}
