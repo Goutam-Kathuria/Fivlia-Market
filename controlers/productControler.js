@@ -611,7 +611,7 @@ exports.getUserCategoryWiseProducts = async (req, res) => {
 exports.getUserProducts = async (req, res) => {
   try {
     const { bannerId } = req.params;
-    const userId = req.user || req.query.userId;
+    const userId = req.query.userId;
 
     const Banner = await banner.findById(bannerId);
     if (!Banner) {
@@ -631,6 +631,7 @@ exports.getUserProducts = async (req, res) => {
 
     const productsRaw = await products
       .find({ _id: { $in: Banner.productId }, productStatus: "active" })
+      .populate("userId", "name")
       .sort({ createdAt: -1 });
     const productsList = addDistanceKm(productsRaw, userLat, userLng);
 
@@ -638,7 +639,7 @@ exports.getUserProducts = async (req, res) => {
       message: "Products fetched successfully",
       productsList,
     });
-
+    
   } catch (error) {
     console.error(error);
     return res.status(500).json({
