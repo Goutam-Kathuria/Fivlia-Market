@@ -338,12 +338,14 @@ exports.getAdminSetting = async (req, res) => {
 
 exports.getAppSetting = async (req, res) => {
   try {
-    const settings = await setting.findOne().select("productPrice").lean();
+    const settings = await setting.findOne().select("productPrice", "term_and_conditons", "safety_and_policy").lean();
 
     return res.status(200).json({
       message: "Setting fetched successfully",
       data: {
         productPrice: settings?.productPrice ?? 0,
+        term_and_conditions: settings?.term_and_conditions ?? "",
+        safety_and_policy: settings?.safety_and_policy ?? "",
       },
     });
   } catch (error) {
