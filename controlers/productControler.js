@@ -364,12 +364,6 @@ exports.repostProduct = async (req, res) => {
     const product = await products.findById(productId);
     if (!product) return res.status(404).json({ message: "Product not found" });
 
-    if (product.productStatus !== "expired") {
-      return res
-        .status(400)
-        .json({ message: "Only expired ads can be reposted." });
-    }
-
     const { name, description, price, address, category, subCategory } =
       req.body;
 
@@ -391,7 +385,7 @@ exports.repostProduct = async (req, res) => {
     expiry.setDate(expiry.getDate() + product.expiryDays);
     product.expiresAt = expiry;
 
-    product.productStatus = "active";
+    product.productStatus = "pending";
 
     await product.save();
 
