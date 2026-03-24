@@ -610,7 +610,8 @@ exports.getUserCategoryWiseProducts = async (req, res) => {
 
 exports.getUserProducts = async (req, res) => {
   try {
-    const {bannerId} = req.params
+    const { bannerId } = req.params;
+    const userId = req.user || req.query.userId;
 
     const Banner = await banner.findById(bannerId);
     if (!Banner) {
@@ -619,15 +620,25 @@ exports.getUserProducts = async (req, res) => {
 
     console.log("Banner found:", Banner);
 
-    const productsList = await products
+    let userLat;
+    let userLng;
+
+    if (userId) {
+      const user = await Users.findById(userId).select("latitude longitude");
+      userLat = user?.latitude;
+      userLng = user?.longitude;
+    }
+
+    const productsRaw = await products
       .find({ _id: { $in: Banner.productId }, productStatus: "active" })
       .sort({ createdAt: -1 });
+    const productsList = addDistanceKm(productsRaw, userLat, userLng);
 
     return res.status(200).json({
       message: "Products fetched successfully",
       productsList,
     });
-    
+
   } catch (error) {
     console.error(error);
     return res.status(500).json({
@@ -635,4 +646,4 @@ exports.getUserProducts = async (req, res) => {
       error: error.message,
     });
   }
-}
+};
