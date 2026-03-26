@@ -45,6 +45,7 @@ const {
   getProfile,
   updateFcmToken,
   editProfile,
+  planRenewal,
 } = require("../controlers/authControler");
 const {
   addProduct,
@@ -65,6 +66,7 @@ router.post("/login", login);
 router.post("/admin/login", adminLogin);
 router.post("/update-fcm-token", verifyToken, updateFcmToken);
 router.post("/edit-profile", upload, verifyToken, editProfile);
+router.post("/plan-renewal", verifyToken, planRenewal);
 
 router.post("/admin/update-setting", upload, adminSetting);
 router.post("/admin/addBanner", verifyAdminToken, upload, addAdminBanner);

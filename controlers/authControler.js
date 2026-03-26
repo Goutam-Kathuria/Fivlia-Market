@@ -1,6 +1,10 @@
 const User = require("../modals/user");
-const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+
+const Product = require("../modals/product");
+const Banner = require("../modals/banner");
+const Setting = require("../modals/setting");
+
 const {
   normalizeFcmToken,
   isLikelyFcmToken,
@@ -59,14 +63,12 @@ exports.login = async (req, res) => {
       process.env.JWT_SECRET,
     );
 
-    return res
-      .status(200)
-      .json({
-        message: "Login Successfully",
-        token,
-        userId: user._id,
-        userName: user.name,
-      });
+    return res.status(200).json({
+      message: "Login Successfully",
+      token,
+      userId: user._id,
+      userName: user.name,
+    });
   } catch (error) {
     console.error("Error creating store:", error);
     return res
@@ -161,14 +163,116 @@ exports.forgotPassword = async (req, res) => {
     const user = await User.findOne({ mobileNumber });
     if (!user) {
       return res.status(404).json({ message: "User not found" });
-    } 
-    
+    }
+
     user.password = newPassword;
     await user.save();
 
     return res.status(200).json({ message: "Password updated successfully" });
   } catch (error) {
     console.error("Error updating password:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.planRenewal = async (req, res) => {
+  try {
+    const userId = req.user;
+    const { id, type, transactionId } = req.body;
+
+    if (!id || !type) {
+      return res.status(400).json({ message: "id and type are required" });
+    }
+
+    if (!transactionId || String(transactionId).trim() === "") {
+      return res.status(400).json({
+        message: "Transaction ID is required for renewal",
+      });
+    }
+
+    const normalizedTransactionId = String(transactionId).trim();
+
+    /*
+    PRODUCT RENEWAL
+    */
+    if (type === "product") {
+      const product = await Product.findByIdAndUpdate(
+        id,
+        {
+          productStatus: "active",
+          transactionId: normalizedTransactionId,
+        },
+        { new: true },
+      );
+
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      const settings = await Setting.findOne().select("productPrice").lean();
+
+      let amount = Number(settings?.productPrice ?? 0);
+      if (!Number.isFinite(amount) || amount < 0) amount = 0;
+
+      try {
+        await Earning.create({
+          sourceType: "product",
+          amount,
+          transactionId: normalizedTransactionId,
+          userId,
+          referenceModel: "product",
+          referenceId: product._id,
+          meta: {
+            renewal: true,
+          },
+        });
+      } catch (earningError) {
+        if (earningError?.code !== 11000) {
+          console.error("Failed to record product renewal:", earningError);
+        }
+      }
+    }
+
+    /*
+    BANNER RENEWAL
+    */
+    if (type === "banner") {
+      const banner = await Banner.findById(id);
+
+      if (!banner) {
+        return res.status(404).json({ message: "Banner not found" });
+      }
+
+      const selectedPlan = await BannerPlan.findById(banner.selectedPlanId)
+        .select("_id price type")
+        .lean();
+
+      if (!selectedPlan) {
+        return res.status(404).json({ message: "Banner plan not found" });
+      }
+
+      banner.status = true;
+      banner.transactionId = normalizedTransactionId;
+      banner.aprroveStatus = "active";
+      await banner.save();
+
+      try {
+        await recordBannerEarning({
+          transactionId: normalizedTransactionId,
+          userId,
+          bannerId: banner._id,
+          selectedPlan,
+        });
+      } catch (err) {
+        console.error("Failed to record banner renewal:", err);
+      }
+    }
+
+    return res.status(200).json({
+      message: "Plan renewed successfully",
+    });
+  } catch (error) {
+    console.error("Error renewing plan:", error);
     return res.status(500).json({ message: "Server error" });
   }
 };
