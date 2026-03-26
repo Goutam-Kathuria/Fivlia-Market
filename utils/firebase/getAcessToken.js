@@ -9,12 +9,12 @@ const getAccessToken = async () => {
     }
 
     const tokenResponse = await credential.getAccessToken();
-    // console.log("tokenResponse",tokenResponse)
+    console.log("tokenResponse",tokenResponse)
     return tokenResponse?.access_token || null;
   } catch (error) {
     console.error("Failed to get access token:", error.message);
     return null;
   }
 };
-// getAccessToken()
+getAccessToken()
 module.exports = getAccessToken;
