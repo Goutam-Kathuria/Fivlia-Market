@@ -15,9 +15,12 @@ const {
 } = require("../utils/firebase/fcmToken");
 const { getCoordinateInputsFromBody } = require("../utils/bannerHelpers");
 const {
-  parseAdminBannerDate,
   resolveAdminBannerLocationFields,
 } = require("../utils/adminBannerHelpers");
+
+const {
+  getBannerExpiryDate,
+} = require("../utils/bannerHelpers");
 
 const toArray = (value) => {
   if (value === undefined || value === null || value === "") return [];
@@ -96,9 +99,8 @@ const parseRadius = (value, fallback = 5) => {
 
 exports.addAdminBanner = async (req, res) => {
   try {
-    const { title, mainCategory, subCategory, fromDate, toDate } = req.body;
-    const cityInput =
-      req.body.cityId !== undefined ? req.body.cityId : req.body.city;
+    const { title, mainCategory, subCategory } = req.body;
+    
     const { latitude: latitudeInput, longitude: longitudeInput } =
       getCoordinateInputsFromBody(req.body);
 
@@ -106,27 +108,7 @@ exports.addAdminBanner = async (req, res) => {
       return res.status(400).json({ message: "Main category is required" });
     }
 
-    const parsedFromDate = parseAdminBannerDate(fromDate);
-    const parsedToDate = parseAdminBannerDate(toDate);
-
-    if (!parsedFromDate || !parsedToDate) {
-      return res.status(400).json({
-        message: "Valid fromDate and toDate are required",
-      });
-    }
-
     const now = new Date();
-    if (parsedFromDate.getTime() < now.getTime()) {
-      return res.status(400).json({
-        message: "fromDate must be current or future date/time",
-      });
-    }
-
-    if (parsedToDate.getTime() <= parsedFromDate.getTime()) {
-      return res
-        .status(400)
-        .json({ message: "toDate must be greater than fromDate" });
-    }
 
     const foundCategory = await Category.findById(mainCategory).lean();
     if (!foundCategory) {
@@ -152,10 +134,8 @@ exports.addAdminBanner = async (req, res) => {
 
     const rawImagePath = req.files?.image?.[0]?.key || "";
     const image = rawImagePath ? `/${rawImagePath}` : "";
-    const shouldBeActive = parsedFromDate.getTime() <= now.getTime();
 
     const locationResolution = await resolveAdminBannerLocationFields({
-      cityInput,
       latitudeInput,
       longitudeInput,
     });
@@ -165,6 +145,8 @@ exports.addAdminBanner = async (req, res) => {
         .status(locationResolution.error.status)
         .json({ message: locationResolution.error.message });
     }
+
+    const toDate = getBannerExpiryDate(now);
 
     const banner = await Banner.create({
       image,
@@ -176,9 +158,9 @@ exports.addAdminBanner = async (req, res) => {
       approvalReason: "",
       approvedAt: now,
       selectedPlanId:"69b92e7d60abe84e9d3c5859",
-      fromDate: parsedFromDate,
-      toDate: parsedToDate,
-      status: shouldBeActive,
+      fromDate: now,
+      toDate,
+      status: true,
       mainCategory: foundCategory._id,
       subCategory: foundSubCategory ? foundSubCategory._id : null,
       addedBy:"admin",

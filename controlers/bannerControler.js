@@ -17,8 +17,8 @@ const {
   getCoordinateInputsFromBody,
   resolveBannerCoordinates,
   normalizePlanType,
-  isHomeBannerPlanType,
   isCategoryBannerPlanType,
+  isHomeBannerPlanType,
   normalizeProductIds,
   getBannerExpiryDate,
   attachSubCategory,
@@ -80,11 +80,9 @@ exports.banner = async (req, res) => {
         .json({ message: `Plan ${normalizedPlanId} not found or inactive` });
     }
 
-    const requiresCategory = isCategoryBannerPlanType(selectedPlan.type);
     let foundCategory = null;
     let foundSubCategory = null;
 
-    if (requiresCategory) {
       if (!mainCategory) {
         return res.status(400).json({ message: "Main category is required" });
       }
@@ -117,7 +115,6 @@ exports.banner = async (req, res) => {
           .status(404)
           .json({ message: `SubCategory ${subCategory} not found` });
       }
-    }
 
     const productResolution = normalizeProductIds(productId, {
       required: true,
@@ -579,7 +576,7 @@ exports.getAllBanner = async (req, res) => {
   try {
     await expireBanner();
 
-    const banners = await Banner.find()
+    const banners = await Banner.find({aprroveStatus:{$ne:"pending"}})
       .sort({ createdAt: -1 })
 
       // Main category name
