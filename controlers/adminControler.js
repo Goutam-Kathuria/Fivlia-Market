@@ -175,6 +175,7 @@ exports.addAdminBanner = async (req, res) => {
       aprroveStatus: "active",
       approvalReason: "",
       approvedAt: now,
+      selectedPlanId:"69b92e7d60abe84e9d3c5859",
       fromDate: parsedFromDate,
       toDate: parsedToDate,
       status: shouldBeActive,

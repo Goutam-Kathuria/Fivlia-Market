@@ -2,8 +2,8 @@ const mongoose = require("mongoose");
 
 const DEFAULT_BANNER_DURATION_DAYS = 30;
 const MILLISECONDS_IN_A_DAY = 24 * 60 * 60 * 1000;
-const HOME_BANNER_PLAN_TYPE = "Home Banner";
-const CATEGORY_BANNER_PLAN_TYPE = "Category Banner";
+const HOME_BANNER_PLAN_TYPE = "Homepage";
+const CATEGORY_BANNER_PLAN_TYPE = "Category";
 
 const parseBooleanInput = (value) => {
   if (value === undefined || value === null || value === "") return undefined;
@@ -161,6 +161,7 @@ const normalizePlanType = (value) => {
 
   const lowered = raw.toLowerCase();
   if (
+    lowered === HOME_BANNER_PLAN_TYPE.toLowerCase() ||
     lowered === "home" ||
     lowered === "home banner" ||
     lowered === "home-banner" ||
@@ -171,6 +172,7 @@ const normalizePlanType = (value) => {
   }
 
   if (
+    lowered === CATEGORY_BANNER_PLAN_TYPE.toLowerCase() ||
     lowered === "category" ||
     lowered === "category banner" ||
     lowered === "category-banner" ||
