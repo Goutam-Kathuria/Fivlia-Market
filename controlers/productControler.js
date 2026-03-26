@@ -117,8 +117,6 @@ exports.getProduct = async (req, res) => {
 
     const isUserOwnListing = userId && !category && cleanSearch === undefined;
 
-    const isBrowseListing = userId && cleanSearch === "";
-
     const isSearchListing = userId && cleanSearch && cleanSearch.length > 0;
 
     const isCategoryListing = userId && category;
@@ -143,26 +141,12 @@ exports.getProduct = async (req, res) => {
     let userLng;
     let radiusKm = DEFAULT_PRODUCT_RADIUS_KM;
 
-    if (isBrowseListing || isCategoryListing || isSearchListing) {
+    if (isCategoryListing || isSearchListing) {
       const globalSettings = await Setting.findOne().select("radius").lean();
       radiusKm = parseRadius(
         globalSettings?.radius,
         DEFAULT_PRODUCT_RADIUS_KM,
       );
-    }
-
-    if (isBrowseListing) {
-      filter.productStatus = "active";
-      filter.expiresAt = { $gt: new Date() };
-      filter.paymentType = "paid";
-      filter.userId = { $ne: userId };
-      const user = await Users.findById(userId).select("latitude longitude");
-
-      if (user?.latitude && user?.longitude) {
-        userLat = user.latitude;
-        userLng = user.longitude;
-        applyLocationFilter(filter, userLat, userLng, radiusKm);
-      }
     }
 
     // =========================
@@ -325,7 +309,7 @@ exports.editProduct = async (req, res) => {
     //   return res.status(403).json({ message: "Not allowed" });
     // }
 
-    const { name, description, price, address, category, subCategory } =
+    const { name, description, price, paymentType, address, category, subCategory } =
       req.body;
 
     // Editable fields
@@ -336,8 +320,8 @@ exports.editProduct = async (req, res) => {
 
     if (category) product.category = category;
     if (subCategory) product.subCategory = subCategory;
+    if (paymentType) product.paymentType = paymentType;
 
-    // Image handling
     if (req.files?.MultipleImage) {
       product.image = req.files.MultipleImage.map((f) => `/${f.key}`);
     }
@@ -417,7 +401,9 @@ exports.getPublicListing = async (req, res) => {
       productStatus: "active",
       expiresAt: { $gt: new Date() },
       userId: { $ne: userId },
+      paymentType: "paid",
     };
+    
     const globalSettings = await Setting.findOne().select("radius").lean();
     const radiusKm = parseRadius(
       globalSettings?.radius,
