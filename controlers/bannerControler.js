@@ -154,6 +154,7 @@ exports.banner = async (req, res) => {
       transactionId: String(transactionId).trim(),
       mainCategory: foundCategory?._id || null,
       subCategory: foundSubCategory?._id || null,
+      addedBy:"user",
     });
 
     await recordBannerEarning({

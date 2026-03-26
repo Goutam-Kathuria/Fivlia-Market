@@ -26,6 +26,7 @@ const bannerSchema = new mongoose.Schema(
     toDate: Date,
     status: { type: Boolean, default: false },
     transactionId: String,
+    addedBy:String,
   },
   { timestamps: true },
 );
