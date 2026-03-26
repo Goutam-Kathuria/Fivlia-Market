@@ -2,9 +2,11 @@ const User = require("../modals/user");
 const jwt = require("jsonwebtoken");
 
 const Product = require("../modals/product");
+const BannerPlan = require("../modals/banner_type");
 const Banner = require("../modals/banner");
 const Setting = require("../modals/setting");
 const sendFcmPush = require("../utils/firebase/sendNotification");
+const { recordBannerEarning } = require("../utils/bannerEarnings");
 
 const {
   normalizeFcmToken,
