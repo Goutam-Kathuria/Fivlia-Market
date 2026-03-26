@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const Product = require("../modals/product");
 const Banner = require("../modals/banner");
 const Setting = require("../modals/setting");
+const sendFcmPush = require("../utils/firebase/sendNotification");
 
 const {
   normalizeFcmToken,
@@ -276,3 +277,33 @@ exports.planRenewal = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+
+exports.sendChatNotification = async (req, res) =>{
+  try{
+    const { name, receiverId, message } = req.body;
+
+    if (!receiverId || !message) {
+      return res.status(400).json({ message: "ReceiverId and message are required" });
+    }
+
+    const receiver = await User.findById(receiverId).select("fcmToken").lean();
+    if (!receiver || !receiver.fcmToken) {
+      return res.status(404).json({ message: "Receiver not found or has no FCM token" });
+    }
+
+    const pushPayload = {
+      title: name,
+      body: message,
+      data: {},
+    };
+
+    const result = sendFcmPush(receiver.fcmToken, pushPayload)
+
+    console.log("Chat notification sent:", result);
+    res.json({ message: "Notification sent"});
+
+  }catch(error){
+    console.error("Error sending chat notification:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+}

@@ -46,6 +46,7 @@ const {
   updateFcmToken,
   editProfile,
   planRenewal,
+  sendChatNotification
 } = require("../controlers/authControler");
 const {
   addProduct,
@@ -67,6 +68,7 @@ router.post("/admin/login", adminLogin);
 router.post("/update-fcm-token", verifyToken, updateFcmToken);
 router.post("/edit-profile", upload, verifyToken, editProfile);
 router.post("/plan-renewal", verifyToken, planRenewal);
+router.post("/send-chat-notification", sendChatNotification);
 
 router.post("/admin/update-setting", upload, adminSetting);
 router.post("/admin/addBanner", verifyAdminToken, upload, addAdminBanner);
