@@ -836,3 +836,30 @@ exports.editPlans = async (req, res) => {
     res.status(500).json({ message: "Update failed" });
   }
 };
+
+exports.deleteBanner = async (req, res) => {
+  try {
+    const userId = req.user;
+    const { bannerId } = req.params;
+
+    const deletedBanner = await Banner.findOneAndDelete({
+      _id: bannerId,
+      userId: userId, // 🔐 only owner can delete
+    });
+
+    if (!deletedBanner) {
+      return res.status(404).json({ message: "Banner not found" });
+    }
+
+    return res.status(200).json({
+      message: "Banner Deleted",
+      deletedBanner,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "Failed to delete banner",
+      error: error.message,
+    });
+  }
+};

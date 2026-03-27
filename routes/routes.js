@@ -21,6 +21,7 @@ const {
   addPlans,
   editPlans,
   getPlans,
+  deleteBanner
 } = require("../controlers/bannerControler");
 
 const { saveLocation, getCity } = require("../controlers/locationControler");
@@ -118,6 +119,7 @@ router.post("/update-banner-approval/:id", verifyAdminToken, updateBannerApprova
 router.post("/addPlans", addPlans);
 router.post("/edit-elans/:planId", editPlans);
 router.get("/getPlans", getPlans);
+router.get("/delete-banner/:bannerId", verifyToken, deleteBanner);
 
 router.get("/getBanner", verifyToken, getBanner);
 router.get("/get-all-banner", verifyAdminToken, getAllBanner);
