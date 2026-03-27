@@ -9,6 +9,9 @@ const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const { getDistanceKm } = require("../utils/location");
 const sendFcmPush = require("../utils/firebase/sendNotification");
+
+const UserNotification = require("../modals/userNotification");
+
 const {
   normalizeFcmToken,
   isLikelyFcmToken,
@@ -18,9 +21,7 @@ const {
   resolveAdminBannerLocationFields,
 } = require("../utils/adminBannerHelpers");
 
-const {
-  getBannerExpiryDate,
-} = require("../utils/bannerHelpers");
+const { getBannerExpiryDate } = require("../utils/bannerHelpers");
 
 const toArray = (value) => {
   if (value === undefined || value === null || value === "") return [];
@@ -100,7 +101,7 @@ const parseRadius = (value, fallback = 5) => {
 exports.addAdminBanner = async (req, res) => {
   try {
     const { title, mainCategory, subCategory } = req.body;
-    
+
     const { latitude: latitudeInput, longitude: longitudeInput } =
       getCoordinateInputsFromBody(req.body);
 
@@ -122,7 +123,7 @@ exports.addAdminBanner = async (req, res) => {
 
     if (hasSubCategory) {
       foundSubCategory = foundCategory.subcat.find(
-        (sub) => sub._id.toString() === String(subCategory)
+        (sub) => sub._id.toString() === String(subCategory),
       );
 
       if (!foundSubCategory) {
@@ -157,13 +158,13 @@ exports.addAdminBanner = async (req, res) => {
       aprroveStatus: "active",
       approvalReason: "",
       approvedAt: now,
-      selectedPlanId:"69b92e7d60abe84e9d3c5859",
+      selectedPlanId: "69b92e7d60abe84e9d3c5859",
       fromDate: now,
       toDate,
       status: true,
       mainCategory: foundCategory._id,
       subCategory: foundSubCategory ? foundSubCategory._id : null,
-      addedBy:"admin",
+      addedBy: "admin",
     });
 
     return res.status(201).json({
@@ -181,8 +182,15 @@ exports.addAdminBanner = async (req, res) => {
 
 exports.adminSetting = async (req, res) => {
   try {
-    const { name, email, password, term_and_conditons, safety_and_policy, radius, productPrice } =
-      req.body;
+    const {
+      name,
+      email,
+      password,
+      term_and_conditons,
+      safety_and_policy,
+      radius,
+      productPrice,
+    } = req.body;
     const rawImagePath = req.files?.image?.[0]?.key;
 
     const updateData = {};
@@ -253,7 +261,8 @@ exports.adminLogin = async (req, res) => {
     const settings = await setting.findOne().lean();
     if (!settings || !settings.email || !settings.password) {
       return res.status(404).json({
-        message: "Admin credentials are not configured. Please update settings first.",
+        message:
+          "Admin credentials are not configured. Please update settings first.",
       });
     }
 
@@ -326,7 +335,10 @@ exports.getAdminSetting = async (req, res) => {
 
 exports.getAppSetting = async (req, res) => {
   try {
-    const settings = await setting.findOne().select("productPrice term_and_conditons safety_and_policy").lean();
+    const settings = await setting
+      .findOne()
+      .select("productPrice term_and_conditons safety_and_policy")
+      .lean();
 
     return res.status(200).json({
       message: "Setting fetched successfully",
@@ -441,11 +453,12 @@ exports.createNotification = async (req, res) => {
   try {
     const {
       title,
-      type = "general",
+      type,
       sendType = "user",
       description,
       data = {},
       city,
+      refId,
       screen,
     } = req.body;
 
@@ -467,6 +480,7 @@ exports.createNotification = async (req, res) => {
       data: parseNotificationData(data),
       city: normalizeCityIds(city),
       screen,
+      refId,
     };
 
     if (image) {
@@ -521,6 +535,9 @@ exports.editNotification = async (req, res) => {
 
     if (req.body.screen !== undefined) {
       updateData.screen = req.body.screen;
+    }
+    if (req.body.refId !== undefined) {
+      updateData.refId = req.body.refId;
     }
 
     if (req.files?.image?.length) {
@@ -649,7 +666,10 @@ exports.sendNotification = async (req, res) => {
             user.longitude,
           );
 
-          if (nearestUserDistanceKm === null || distance < nearestUserDistanceKm) {
+          if (
+            nearestUserDistanceKm === null ||
+            distance < nearestUserDistanceKm
+          ) {
             nearestUserDistanceKm = distance;
           }
 
@@ -713,8 +733,20 @@ exports.sendNotification = async (req, res) => {
     };
 
     const sendResults = await Promise.allSettled(
-      usersWithValidToken.map((user) => sendFcmPush(user.fcmToken, pushPayload)),
+      usersWithValidToken.map((user) =>
+        sendFcmPush(user.fcmToken, pushPayload),
+      ),
     );
+
+    const notificationDocs = usersWithValidToken.map((user) => ({
+      userId: user._id,
+      title: notification.title,
+      description: notification.description,
+      screen: notification.screen,
+      refId: notification.refId,
+    }));
+
+    await UserNotification.insertMany(notificationDocs);
 
     const failedCount = sendResults.filter(
       (result) => result.status === "rejected",

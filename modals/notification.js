@@ -5,7 +5,7 @@ const notificationSchema = new mongoose.Schema(
     title: { type: String, required: true, trim: true },
     type: {
       type: String,
-      enum: ["general"],
+      enum: ["general", "broadcast", "promotion"],
       default: "general",
     },
     sendType: {
@@ -13,6 +13,7 @@ const notificationSchema = new mongoose.Schema(
       enum: ["user"],
       default: "user",
     },
+    refId: { type: mongoose.Schema.Types.ObjectId },
     description: { type: String, required: true },
     data: { type: Object, default: {} },
     isRead: { type: Boolean, default: false },

@@ -7,6 +7,7 @@ const Banner = require("../modals/banner");
 const Setting = require("../modals/setting");
 const sendFcmPush = require("../utils/firebase/sendNotification");
 const { recordBannerEarning } = require("../utils/bannerEarnings");
+const UserNotification = require("../modals/userNotification");
 
 const {
   normalizeFcmToken,
@@ -280,17 +281,21 @@ exports.planRenewal = async (req, res) => {
   }
 };
 
-exports.sendChatNotification = async (req, res) =>{
-  try{
+exports.sendChatNotification = async (req, res) => {
+  try {
     const { name, receiverId, message } = req.body;
 
     if (!receiverId || !message) {
-      return res.status(400).json({ message: "ReceiverId and message are required" });
+      return res
+        .status(400)
+        .json({ message: "ReceiverId and message are required" });
     }
 
     const receiver = await User.findById(receiverId).select("fcmToken").lean();
     if (!receiver || !receiver.fcmToken) {
-      return res.status(404).json({ message: "Receiver not found or has no FCM token" });
+      return res
+        .status(404)
+        .json({ message: "Receiver not found or has no FCM token" });
     }
 
     const pushPayload = {
@@ -299,13 +304,58 @@ exports.sendChatNotification = async (req, res) =>{
       data: {},
     };
 
-    const result = sendFcmPush(receiver.fcmToken, pushPayload)
+    const result = sendFcmPush(receiver.fcmToken, pushPayload);
 
     console.log("Chat notification sent:", result);
-    res.json({ message: "Notification sent"});
-
-  }catch(error){
+    res.json({ message: "Notification sent" });
+  } catch (error) {
     console.error("Error sending chat notification:", error);
     return res.status(500).json({ message: "Server error" });
   }
-}
+};
+
+exports.deleteNotification = async (req, res) => {
+  try {
+    const { type, id } = req.body;
+    const userId = req.user;
+
+    if (type === "single") {
+      await UserNotification.deleteOne({
+        _id: id,
+        userId,
+      });
+    }
+
+    if (type === "all") {
+      await UserNotification.deleteMany({
+        userId,
+      });
+    }
+
+    return res.status(200).json({
+      message: "Notification deleted",
+    });
+  } catch (error) {
+    console.error("Delete notification error:", error);
+
+    return res.status(500).json({
+      message: "Server error",
+    });
+  }
+};
+
+exports.getUserNotifications = async (req, res) => {
+  const userId = req.user;
+
+  const notifications = await UserNotification.find({ userId })
+    .sort({ createdAt: -1 })
+    .limit(50)
+    .lean();
+
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  res.json({
+    data: notifications,
+    unreadCount,
+  });
+};

@@ -46,7 +46,9 @@ const {
   updateFcmToken,
   editProfile,
   planRenewal,
-  sendChatNotification
+  sendChatNotification,
+  deleteNotification,
+  getUserNotifications,
 } = require("../controlers/authControler");
 const {
   addProduct,
@@ -129,4 +131,7 @@ router.post("/edit-notification/:id", upload, editNotification);
 router.get("/get-notification", getNotifications);
 router.post("/send-notification", sendNotification);
 
+router.post("/delete-notification", verifyToken, deleteNotification)
+
+router.get("/get-user-notification", verifyToken, getUserNotifications);
 module.exports = router;
