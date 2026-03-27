@@ -181,7 +181,7 @@ exports.addAdminBanner = async (req, res) => {
 
 exports.adminSetting = async (req, res) => {
   try {
-    const { name, email, password, term_and_conditons, radius, productPrice } =
+    const { name, email, password, term_and_conditons, safety_and_policy, radius, productPrice } =
       req.body;
     const rawImagePath = req.files?.image?.[0]?.key;
 
@@ -201,6 +201,10 @@ exports.adminSetting = async (req, res) => {
 
     if (term_and_conditons !== undefined) {
       updateData.term_and_conditons = term_and_conditons;
+    }
+
+    if (safety_and_policy !== undefined) {
+      updateData.safety_and_policy = safety_and_policy;
     }
 
     if (radius !== undefined) {

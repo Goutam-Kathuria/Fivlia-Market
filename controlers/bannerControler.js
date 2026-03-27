@@ -7,7 +7,10 @@ const mongoose = require("mongoose");
 const { getBannersWithinRadius } = require("../utils/location");
 const expireBanner = require("../utils/expireBanner");
 const { validateBannerImageSize } = require("../utils/bannerImage");
-const { recordBannerEarning, attachBannerEarnings } = require("../utils/bannerEarnings");
+const {
+  recordBannerEarning,
+  attachBannerEarnings,
+} = require("../utils/bannerEarnings");
 const {
   CATEGORY_BANNER_PLAN_TYPE,
   parseBooleanInput,
@@ -83,38 +86,38 @@ exports.banner = async (req, res) => {
     let foundCategory = null;
     let foundSubCategory = null;
 
-      if (!mainCategory) {
-        return res.status(400).json({ message: "Main category is required" });
-      }
+    if (!mainCategory) {
+      return res.status(400).json({ message: "Main category is required" });
+    }
 
-      if (!mongoose.Types.ObjectId.isValid(String(mainCategory))) {
-        return res.status(400).json({ message: "Invalid mainCategory id" });
-      }
+    if (!mongoose.Types.ObjectId.isValid(String(mainCategory))) {
+      return res.status(400).json({ message: "Invalid mainCategory id" });
+    }
 
-      if (!subCategory || String(subCategory).trim() === "") {
-        return res.status(400).json({ message: "Sub category is required" });
-      }
+    if (!subCategory || String(subCategory).trim() === "") {
+      return res.status(400).json({ message: "Sub category is required" });
+    }
 
-      if (!mongoose.Types.ObjectId.isValid(String(subCategory))) {
-        return res.status(400).json({ message: "Invalid subCategory id" });
-      }
+    if (!mongoose.Types.ObjectId.isValid(String(subCategory))) {
+      return res.status(400).json({ message: "Invalid subCategory id" });
+    }
 
-      foundCategory = await Category.findOne({ _id: mainCategory });
-      if (!foundCategory) {
-        return res
-          .status(404)
-          .json({ message: `Category ${mainCategory} not found` });
-      }
+    foundCategory = await Category.findOne({ _id: mainCategory });
+    if (!foundCategory) {
+      return res
+        .status(404)
+        .json({ message: `Category ${mainCategory} not found` });
+    }
 
-      foundSubCategory = foundCategory.subcat.find(
-        (sub) => sub._id.toString() === String(subCategory),
-      );
+    foundSubCategory = foundCategory.subcat.find(
+      (sub) => sub._id.toString() === String(subCategory),
+    );
 
-      if (!foundSubCategory) {
-        return res
-          .status(404)
-          .json({ message: `SubCategory ${subCategory} not found` });
-      }
+    if (!foundSubCategory) {
+      return res
+        .status(404)
+        .json({ message: `SubCategory ${subCategory} not found` });
+    }
 
     const productResolution = normalizeProductIds(productId, {
       required: true,
@@ -151,7 +154,7 @@ exports.banner = async (req, res) => {
       transactionId: String(transactionId).trim(),
       mainCategory: foundCategory?._id || null,
       subCategory: foundSubCategory?._id || null,
-      addedBy:"user",
+      addedBy: "user",
     });
 
     await recordBannerEarning({
@@ -218,7 +221,10 @@ exports.getBanner = async (req, res) => {
 
     const filters = { aprroveStatus: "active", status: true };
     const globalSettings = await Setting.findOne().select("radius").lean();
-    const radiusKm = parseRadius(globalSettings?.radius, DEFAULT_BANNER_RADIUS_KM);
+    const radiusKm = parseRadius(
+      globalSettings?.radius,
+      DEFAULT_BANNER_RADIUS_KM,
+    );
 
     const allBanners = await Banner.find(filters)
       .populate({
@@ -242,8 +248,8 @@ exports.getBanner = async (req, res) => {
 
     // Home screen returns only home banners.
     if (!normalizedCategoryId) {
-      bannersWithSubcat = bannersWithSubcat.filter(
-        (banner) => isHomeBannerPlanType(banner.selectedPlanId?.type),
+      bannersWithSubcat = bannersWithSubcat.filter((banner) =>
+        isHomeBannerPlanType(banner.selectedPlanId?.type),
       );
     } else {
       if (!mongoose.Types.ObjectId.isValid(normalizedCategoryId)) {
@@ -255,16 +261,19 @@ exports.getBanner = async (req, res) => {
         .lean();
 
       const homeBanners = bannersWithSubcat.filter(
-        (banner) => isHomeBannerPlanType(banner.selectedPlanId?.type),
+        (banner) =>
+          isHomeBannerPlanType(banner.selectedPlanId?.type) &&
+          String(banner.mainCategory?._id || banner.mainCategory) ===
+            normalizedCategoryId,
       );
-
+      
       let categoryMatched = [];
 
       if (isMainCategory) {
         categoryMatched = bannersWithSubcat.filter(
           (banner) =>
             String(banner.mainCategory?._id || banner.mainCategory) ===
-              normalizedCategoryId,
+            normalizedCategoryId,
         );
       } else {
         const isSubCategory = await Category.findOne({
@@ -280,17 +289,19 @@ exports.getBanner = async (req, res) => {
         categoryMatched = bannersWithSubcat.filter(
           (banner) =>
             String(banner.subCategory?._id || banner.subCategory) ===
-              normalizedCategoryId,
+            normalizedCategoryId,
         );
       }
 
       const seenBannerIds = new Set();
-      bannersWithSubcat = [...homeBanners, ...categoryMatched].filter((banner) => {
-        const bannerId = String(banner._id);
-        if (seenBannerIds.has(bannerId)) return false;
-        seenBannerIds.add(bannerId);
-        return true;
-      });
+      bannersWithSubcat = [...homeBanners, ...categoryMatched].filter(
+        (banner) => {
+          const bannerId = String(banner._id);
+          if (seenBannerIds.has(bannerId)) return false;
+          seenBannerIds.add(bannerId);
+          return true;
+        },
+      );
     }
     const matchedBanners = await getBannersWithinRadius(
       userLatitude,
@@ -435,9 +446,7 @@ exports.updateBannerStatus = async (req, res) => {
 
     if (isMainCategoryProvided) {
       if (normalizedMainCategoryId === null) {
-        return res
-          .status(400)
-          .json({ message: "mainCategory is required" });
+        return res.status(400).json({ message: "mainCategory is required" });
       }
 
       if (!mongoose.Types.ObjectId.isValid(normalizedMainCategoryId)) {
@@ -472,7 +481,10 @@ exports.updateBannerStatus = async (req, res) => {
         });
       }
 
-      if (!foundCategory || String(foundCategory._id) !== resolvedMainCategoryId) {
+      if (
+        !foundCategory ||
+        String(foundCategory._id) !== resolvedMainCategoryId
+      ) {
         foundCategory = await Category.findById(resolvedMainCategoryId).lean();
       }
 
@@ -489,7 +501,9 @@ exports.updateBannerStatus = async (req, res) => {
       if (!foundSubCategory) {
         return res
           .status(404)
-          .json({ message: `SubCategory ${normalizedSubCategoryId} not found` });
+          .json({
+            message: `SubCategory ${normalizedSubCategoryId} not found`,
+          });
       }
 
       updateData.subCategory = foundSubCategory._id;
@@ -576,7 +590,7 @@ exports.getAllBanner = async (req, res) => {
   try {
     await expireBanner();
 
-    const banners = await Banner.find({aprroveStatus:{$ne:"pending"}})
+    const banners = await Banner.find({ aprroveStatus: { $ne: "pending" } })
       .sort({ createdAt: -1 })
 
       // Main category name
@@ -794,7 +808,9 @@ exports.editPlans = async (req, res) => {
     if (req.body.status !== undefined) {
       const parsedStatus = parseBooleanInput(req.body.status);
       if (parsedStatus === null) {
-        return res.status(400).json({ message: "Status must be true or false" });
+        return res
+          .status(400)
+          .json({ message: "Status must be true or false" });
       }
       update.status = parsedStatus;
     }
