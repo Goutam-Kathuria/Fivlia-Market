@@ -42,7 +42,7 @@ exports.addProduct = async (req, res) => {
       address,
       productType,
       paymentType,
-      transactionId
+      transactionId,
     } = req.body;
     const image =
       `/${req.files?.MultipleImage?.[0]?.key}` || req.body.MultipleImage || "";
@@ -50,10 +50,24 @@ exports.addProduct = async (req, res) => {
     subCategory = subCategory || null;
     userId = userId || null;
 
-    if(paymentType === "paid" && !transactionId){
-      return res.status(400).json({ message: "Transaction ID is required for paid products" });
+    if (paymentType === "paid" && !transactionId) {
+      return res
+        .status(400)
+        .json({ message: "Transaction ID is required for paid products" });
     }
-    
+
+    if (paymentType === "free") {
+      const freeProductCount = await products.countDocuments({
+        userId,
+        paymentType: "free",
+      });
+
+      if (freeProductCount >= 10) {
+        return res.status(400).json({
+          message: "Free product limit reached (max 10). Upgrade to paid.",
+        });
+      }
+    }
     const newProduct = await products.create({
       name,
       description,
@@ -143,10 +157,7 @@ exports.getProduct = async (req, res) => {
 
     if (isCategoryListing || isSearchListing) {
       const globalSettings = await Setting.findOne().select("radius").lean();
-      radiusKm = parseRadius(
-        globalSettings?.radius,
-        DEFAULT_PRODUCT_RADIUS_KM,
-      );
+      radiusKm = parseRadius(globalSettings?.radius, DEFAULT_PRODUCT_RADIUS_KM);
     }
 
     // =========================
@@ -309,8 +320,15 @@ exports.editProduct = async (req, res) => {
     //   return res.status(403).json({ message: "Not allowed" });
     // }
 
-    const { name, description, price, paymentType, address, category, subCategory } =
-      req.body;
+    const {
+      name,
+      description,
+      price,
+      paymentType,
+      address,
+      category,
+      subCategory,
+    } = req.body;
 
     // Editable fields
     if (name) product.name = name;
@@ -403,7 +421,7 @@ exports.getPublicListing = async (req, res) => {
       // userId: { $ne: userId },
       paymentType: "paid",
     };
-    
+
     const globalSettings = await Setting.findOne().select("radius").lean();
     const radiusKm = parseRadius(
       globalSettings?.radius,
@@ -566,7 +584,7 @@ exports.getUserCategoryWiseProducts = async (req, res) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    let filter = { userId, productStatus:"active" };
+    let filter = { userId, productStatus: "active" };
     if (category) filter.category = category;
     if (subCategory) filter.subCategory = subCategory;
 
@@ -619,7 +637,6 @@ exports.getUserProducts = async (req, res) => {
       message: "Products fetched successfully",
       productsList,
     });
-    
   } catch (error) {
     console.error(error);
     return res.status(500).json({
