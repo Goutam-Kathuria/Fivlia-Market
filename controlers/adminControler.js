@@ -190,6 +190,7 @@ exports.adminSetting = async (req, res) => {
       safety_and_policy,
       radius,
       productPrice,
+      razor_pay_key,
     } = req.body;
     const rawImagePath = req.files?.image?.[0]?.key;
 
@@ -217,6 +218,10 @@ exports.adminSetting = async (req, res) => {
 
     if (radius !== undefined) {
       updateData.radius = radius;
+    }
+
+    if(razor_pay_key !== undefined){
+      updateData.razor_pay_key = razor_pay_key;
     }
 
     if (productPrice !== undefined) {
@@ -337,7 +342,7 @@ exports.getAppSetting = async (req, res) => {
   try {
     const settings = await setting
       .findOne()
-      .select("productPrice term_and_conditons safety_and_policy")
+      .select("productPrice term_and_conditons safety_and_policy razor_pay_key")
       .lean();
 
     return res.status(200).json({
@@ -346,6 +351,7 @@ exports.getAppSetting = async (req, res) => {
         productPrice: settings?.productPrice ?? 0,
         term_and_conditions: settings?.term_and_conditons ?? "",
         safety_and_policy: settings?.safety_and_policy ?? "",
+        razor_pay_key: settings?.razor_pay_key ?? "",
       },
     });
   } catch (error) {

@@ -10,6 +10,7 @@ const settingSchemma = new mongoose.Schema(
     password:String,
     image:String,
     productPrice:Number,
+    razor_pay_key:String,
   },
   { timestamps: true }
 );
