@@ -8,6 +8,9 @@ const userSchema = new mongoose.Schema({
     fcmToken:String,
     latitude:Number,
     longitude:Number,
-    image:String
+    image:String,
+    adharVerified:{type:Boolean,default:false},
+    adharFrontImage:String,
+    adharBackImage:String,
 },{timestamps:true})
 module.exports=mongoose.model('User',userSchema)
