@@ -66,7 +66,7 @@ const {
   getUserProducts,
 } = require("../controlers/productControler");
 
-router.post("/register", register);
+router.post("/register", upload, register);
 router.post("/login", login);
 router.post("/verify-otp", verifyOtp);
 router.post("/admin/login", adminLogin);
