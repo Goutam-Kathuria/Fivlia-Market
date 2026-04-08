@@ -42,6 +42,7 @@ const {
 const {
   register,
   login,
+  verifyOtp,
   getUsers,
   getProfile,
   updateFcmToken,
@@ -67,6 +68,7 @@ const {
 
 router.post("/register", register);
 router.post("/login", login);
+router.post("/verify-otp", verifyOtp);
 router.post("/admin/login", adminLogin);
 router.post("/update-fcm-token", verifyToken, updateFcmToken);
 router.post("/edit-profile", upload, verifyToken, editProfile);

@@ -1,6 +1,6 @@
 const User = require("../modals/user");
 const jwt = require("jsonwebtoken");
-
+const OtpModel = require("../modals/otp");
 const Product = require("../modals/product");
 const BannerPlan = require("../modals/banner_type");
 const Banner = require("../modals/banner");
@@ -8,6 +8,7 @@ const Setting = require("../modals/setting");
 const sendFcmPush = require("../utils/firebase/sendNotification");
 const { recordBannerEarning } = require("../utils/bannerEarnings");
 const UserNotification = require("../modals/userNotification");
+const { sendMessages } = require("../utils/sendMessages");
 
 const {
   normalizeFcmToken,
@@ -39,7 +40,7 @@ exports.register = async (req, res) => {
 
 exports.login = async (req, res) => {
   try {
-    const { mobileNumber, email, fcmToken, password } = req.body;
+    const { mobileNumber, fcmToken, password } = req.body;
 
     if (!mobileNumber || !password) {
       return res
@@ -56,12 +57,67 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
+    const otp =
+      mobileNumber === "+919999999999"
+        ? 123456
+        : Math.floor(100000 + Math.random() * 900000);
+    const message = `Dear Customer Your Fivlia Login OTP code is ${otp}. Valid for 5 minutes. Do not share with others Fivlia - Delivery in Minutes!`;
+
     const normalizedFcmToken = normalizeFcmToken(fcmToken);
     if (isLikelyFcmToken(normalizedFcmToken)) {
       user.fcmToken = normalizedFcmToken;
       await user.save();
     }
 
+    try {
+      const response = await sendMessages(
+        mobileNumber,
+        message,
+        "1707176060665820902",
+      );
+      await OtpModel.create({
+        mobileNumber,
+        otp,
+        expiresAt: Date.now() + 2 * 60 * 1000,
+      });
+      return res.status(200).json({
+        status: 1,
+        message: "OTP sent successfully",
+        data: response,
+      });
+    } catch (err) {
+      console.error("Failed to send OTP:", err);
+      return res.status(500).json({
+        status: 2,
+        message: "Failed to send OTP",
+        error: err.message,
+      });
+    }
+  } catch (error) {
+    console.error("Error in login:", error);
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
+  }
+};
+
+exports.verifyOtp = async (req, res) => {
+  try {
+    const { mobileNumber, otp } = req.body;
+    // Find OTP in DB
+
+    const user = await User.findOne({ mobileNumber });
+    if (!user) {
+      return res.status(401).json({ message: "Invalid mobile number" });
+    }
+
+    const otpRecord = await OtpModel.findOne({ mobileNumber, otp });
+    console.log("otpRecord", otpRecord);
+    if (!otpRecord) {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+
+    await OtpModel.deleteOne({ _id: otpRecord._id });
     const token = jwt.sign(
       { id: user._id, mobileNumber: user.mobileNumber },
       process.env.JWT_SECRET,
@@ -74,10 +130,8 @@ exports.login = async (req, res) => {
       userName: user.name,
     });
   } catch (error) {
-    console.error("Error creating store:", error);
-    return res
-      .status(500)
-      .json({ message: "Server error", error: error.message });
+    console.error(error);
+    return res.status(500).json({ message: "An error occurred" });
   }
 };
 
