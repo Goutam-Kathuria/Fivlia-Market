@@ -1,5 +1,5 @@
 const Category = require("../modals/category");
-
+const Filter = require("../modals/filter");
 // ---------------- CREATE OR UPDATE CATEGORY ----------------
 exports.saveCategory = async (req, res) => {
   try {
@@ -260,5 +260,32 @@ exports.toggleStatus = async (req, res) => {
     res
       .status(500)
       .json({ message: "❌ Failed to toggle status", error: err.message });
+  }
+};
+
+exports.getFilters = async (req, res) => {
+  try {
+    const { categoryId, subCategoryId } = req.query;
+
+    if (!categoryId) {
+      return res.status(400).json({
+        message: "categoryId is required",
+      });
+    }
+
+    const filterQuery = { categoryId };
+    if (subCategoryId) {
+      filterQuery.subCategoryId = subCategoryId;
+    }
+
+    const filters = await Filter.find(filterQuery).lean();
+
+    return res.status(200).json({
+      message: "Filters fetched successfully",
+      data: filters,
+    });
+  } catch (error) {
+    console.error("Get Filters Error:", error);
+    return res.status(500).json({ message: "Server error" });
   }
 };

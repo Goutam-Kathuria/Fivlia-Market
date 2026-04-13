@@ -11,6 +11,7 @@ const {
   saveSubEntity,
   deleteEntity,
   toggleStatus,
+  getFilters
 } = require("../controlers/categoryControler");
 const {
   banner,
@@ -36,6 +37,9 @@ const {
   getNotifications,
   sendNotification,
   addAdminBanner,
+  addFilter,
+  deleteFilter,
+  getAllFilters
 } = require("../controlers/adminControler");
 
 // ---------------- AUTH ROUTES ----------------
@@ -77,6 +81,10 @@ router.post("/send-chat-notification", sendChatNotification);
 
 router.post("/admin/update-setting", upload, adminSetting);
 router.post("/admin/addBanner", verifyAdminToken, upload, addAdminBanner);
+router.post("/admin/add-filter", verifyAdminToken, addFilter);
+router.delete("/admin/delete-filter/:id", verifyAdminToken, deleteFilter);
+router.get("/admin/get-all-filters", verifyAdminToken, getAllFilters);
+
 router.post("/save-location", verifyToken, saveLocation);
 router.get("/get-city", getCity);
 router.get("/getUsers", getUsers);
@@ -100,6 +108,7 @@ router.delete("/deleteEntity/:catId", deleteEntity);
 // ---------------- STATUS TOGGLE ----------------
 // Toggle Category/Sub Status
 router.patch("/toggleStatus/:catId", toggleStatus);
+router.get("/get-filters", getFilters);
 
 // ---------------- PRODUCT ROUTES ----------------
 router.post("/addProduct", upload, verifyToken, addProduct);

@@ -9,7 +9,7 @@ const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const { getDistanceKm } = require("../utils/location");
 const sendFcmPush = require("../utils/firebase/sendNotification");
-
+const Filter = require("../modals/filter");
 const UserNotification = require("../modals/userNotification");
 
 const {
@@ -791,6 +791,69 @@ exports.sendNotification = async (req, res) => {
       });
     }
 
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.addFilter = async (req, res) => {
+  try {
+    const { filter, categoryId, subCategoryId } = req.body;
+
+    if (!filter || !categoryId) {
+      return res.status(400).json({
+        message: "Filter and categoryId are required",
+      });
+    }
+
+    const newFilter = await Filter.create({
+      filter,
+      categoryId,
+      subCategoryId: subCategoryId || null,
+    });
+
+    return res.status(201).json({
+      message: "Filter added successfully",
+      data: newFilter,
+    });
+  } catch (error) {
+    console.error("Add Filter Error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.getAllFilters = async (req, res) => {
+  try {
+    const filters = await Filter.find().lean();
+
+    return res.status(200).json({
+      message: "Filters fetched successfully",
+      data: filters,
+    });
+  } catch (error) {
+    console.error("Get All Filters Error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.deleteFilter = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ message: "filter ID missing" });
+    }
+
+    const deletedFilter = await Filter.findByIdAndDelete(id);
+
+    if (!deletedFilter) {
+      return res.status(404).json({ message: "Filter not found" });
+    }
+
+    return res.status(200).json({
+      message: "Filter deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete Filter Error:", error);
     return res.status(500).json({ message: "Server error" });
   }
 };
