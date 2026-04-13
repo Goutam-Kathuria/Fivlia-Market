@@ -17,13 +17,12 @@ const {
 
 exports.register = async (req, res) => {
   try {
-    const { name, password, mobileNumber, email, adharCardNumber } = req.body;
+    const { name, mobileNumber, email, adharCardNumber } = req.body;
 
     const adharFrontImage = `/${req.files?.image?.[0]?.key ? req.files?.image?.[0]?.key : ""}`;
     const adharBackImage = `/${req.files?.MultipleImage?.[0]?.key ? req.files?.MultipleImage?.[0]?.key : ""}`;
-    const newUser = await User.create({
+    await User.create({
       name,
-      password,
       mobileNumber,
       email,
       adharCardNumber,
@@ -71,20 +70,16 @@ exports.register = async (req, res) => {
 
 exports.login = async (req, res) => {
   try {
-    const { mobileNumber, fcmToken, password } = req.body;
+    const { mobileNumber, fcmToken } = req.body;
 
-    if (!mobileNumber || !password) {
+    if (!mobileNumber) {
       return res
         .status(400)
-        .json({ message: "mobileNumber and password are required" });
+        .json({ message: "mobileNumber is required" });
     }
 
     const user = await User.findOne({ mobileNumber });
     if (!user) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    if (password !== user.password) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
@@ -223,11 +218,10 @@ exports.getProfile = async (req, res) => {
 exports.editProfile = async (req, res) => {
   try {
     const userId = req.user;
-    const { name, password, mobileNumber, email } = req.body;
+    const { name, mobileNumber, email } = req.body;
 
     const updateData = {};
     if (name !== undefined) updateData.name = name;
-    if (password !== undefined) updateData.password = password;
     if (mobileNumber !== undefined) updateData.mobileNumber = mobileNumber;
     if (email !== undefined) updateData.email = email;
     if (name !== undefined) updateData.name = name;
@@ -241,25 +235,6 @@ exports.editProfile = async (req, res) => {
     return res.status(200).json({ message: "Profile Update" });
   } catch (error) {
     console.error("Error creating store:", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
-
-exports.forgotPassword = async (req, res) => {
-  try {
-    const { mobileNumber, newPassword } = req.body;
-
-    const user = await User.findOne({ mobileNumber });
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    user.password = newPassword;
-    await user.save();
-
-    return res.status(200).json({ message: "Password updated successfully" });
-  } catch (error) {
-    console.error("Error updating password:", error);
     return res.status(500).json({ message: "Server error" });
   }
 };
