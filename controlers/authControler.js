@@ -284,7 +284,8 @@ exports.planRenewal = async (req, res) => {
           }
         }
       } else if (product.paymentType === "free") {
-        product.expiryDays = 90;
+        const settings = await Setting.findOne().select("freeProductExpiryDays").lean();
+        product.expiryDays = settings?.freeProductExpiryDays ?? 90;
       }
 
       // Calculate new expiry date
@@ -296,26 +297,31 @@ exports.planRenewal = async (req, res) => {
       product.transactionId = normalizedTransactionId;
       await product.save();
 
-      const settings = await Setting.findOne().select("productPrice").lean();
+      // Record renewal earning using plan price
+      if (product.paymentType === "paid" && product.selectedPlanId) {
+        const selectedPlan = await ProductPlan.findById(product.selectedPlanId)
+          .select("price")
+          .lean();
 
-      let amount = Number(settings?.productPrice ?? 0);
-      if (!Number.isFinite(amount) || amount < 0) amount = 0;
+        let amount = Number(selectedPlan?.price ?? 0);
+        if (!Number.isFinite(amount) || amount < 0) amount = 0;
 
-      try {
-        await Earning.create({
-          sourceType: "product",
-          amount,
-          transactionId: normalizedTransactionId,
-          userId,
-          referenceModel: "product",
-          referenceId: product._id,
-          meta: {
-            renewal: true,
-          },
-        });
-      } catch (earningError) {
-        if (earningError?.code !== 11000) {
-          console.error("Failed to record product renewal:", earningError);
+        try {
+          await Earning.create({
+            sourceType: "product",
+            amount,
+            transactionId: normalizedTransactionId,
+            userId,
+            referenceModel: "product",
+            referenceId: product._id,
+            meta: {
+              renewal: true,
+            },
+          });
+        } catch (earningError) {
+          if (earningError?.code !== 11000) {
+            console.error("Failed to record product renewal:", earningError);
+          }
         }
       }
     }

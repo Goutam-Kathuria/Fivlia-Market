@@ -9,9 +9,9 @@ const settingSchemma = new mongoose.Schema(
     email:String,
     password:String,
     image:String,
-    productPrice:Number,
     razor_pay_key:String,
     expiryReminderDays:{ type: Number, default: 1 },
+    freeProductExpiryDays:{ type: Number, default: 90 },
   },
   { timestamps: true }
 );

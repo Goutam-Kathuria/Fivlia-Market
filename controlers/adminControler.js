@@ -222,9 +222,9 @@ exports.adminSetting = async (req, res) => {
       term_and_conditons,
       safety_and_policy,
       radius,
-      productPrice,
       razor_pay_key,
       expiryReminderDays,
+      freeProductExpiryDays,
     } = req.body;
     const rawImagePath = req.files?.image?.[0]?.key;
 
@@ -258,20 +258,20 @@ exports.adminSetting = async (req, res) => {
       updateData.razor_pay_key = razor_pay_key;
     }
 
-    if (productPrice !== undefined) {
-      const parsed = Number(productPrice);
-      if (!Number.isFinite(parsed) || parsed < 0) {
-        return res.status(400).json({ message: "Invalid productPrice" });
-      }
-      updateData.productPrice = parsed;
-    }
-
     if (expiryReminderDays !== undefined) {
       const parsed = Number(expiryReminderDays);
       if (!Number.isFinite(parsed) || parsed < 0) {
         return res.status(400).json({ message: "Invalid expiryReminderDays" });
       }
       updateData.expiryReminderDays = parsed;
+    }
+
+    if (freeProductExpiryDays !== undefined) {
+      const parsed = Number(freeProductExpiryDays);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        return res.status(400).json({ message: "Invalid freeProductExpiryDays" });
+      }
+      updateData.freeProductExpiryDays = parsed;
     }
 
     if (rawImagePath) {
@@ -384,13 +384,12 @@ exports.getAppSetting = async (req, res) => {
   try {
     const settings = await setting
       .findOne()
-      .select("productPrice term_and_conditons safety_and_policy razor_pay_key")
+      .select("term_and_conditons safety_and_policy razor_pay_key")
       .lean();
 
     return res.status(200).json({
       message: "Setting fetched successfully",
       data: {
-        productPrice: settings?.productPrice ?? 0,
         term_and_conditions: settings?.term_and_conditons ?? "",
         safety_and_policy: settings?.safety_and_policy ?? "",
         razor_pay_key: settings?.razor_pay_key ?? "",

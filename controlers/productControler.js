@@ -133,7 +133,8 @@ exports.addProduct = async (req, res) => {
       productData.selectedPlanId = selectedPlanId;
       productData.expiryDays = selectedPlan.duration;
     } else if (paymentType === "free") {
-      productData.expiryDays = 90; // 90 days default for free
+      const settings = await Setting.findOne().select("freeProductExpiryDays").lean();
+      productData.expiryDays = settings?.freeProductExpiryDays ?? 90;
     }
 
     const newProduct = await products.create(productData);
@@ -141,8 +142,11 @@ exports.addProduct = async (req, res) => {
     // ========== RECORD PAYMENT EARNING ==========
     if (paymentType === "paid") {
       const normalizedTransactionId = String(transactionId || "").trim();
-      const settings = await Setting.findOne().select("productPrice").lean();
-      let amount = Number(settings?.productPrice ?? 0);
+      const selectedPlan = await ProductPlan.findById(selectedPlanId)
+        .select("price")
+        .lean();
+      
+      let amount = Number(selectedPlan?.price ?? 0);
       if (!Number.isFinite(amount) || amount < 0) amount = 0;
 
       try {
@@ -450,8 +454,9 @@ exports.repostProduct = async (req, res) => {
         }
       }
     } else if (product.paymentType === "free") {
-      // For free products, use 90 days
-      product.expiryDays = 90;
+      // For free products, use setting freeProductExpiryDays
+      const settings = await Setting.findOne().select("freeProductExpiryDays").lean();
+      product.expiryDays = settings?.freeProductExpiryDays ?? 90;
     }
 
     const expiry = new Date();
