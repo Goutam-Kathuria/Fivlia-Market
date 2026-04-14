@@ -728,7 +728,7 @@ exports.updateBannerApproval = async (req, res) => {
 
 exports.addPlans = async (req, res) => {
   try {
-    const type = req.query
+    const { type } = req.query;
 
     const { duration, price, status } = req.body;
 
@@ -759,10 +759,9 @@ exports.addPlans = async (req, res) => {
     if (type === "product") {
       const plan = await ProductPlan.create(payload);
       return res.status(201).json({
-      message: "Product plan added successfully.",
-      data: plan,
-    });
-
+        message: "Product plan added successfully.",
+        data: plan,
+      });
     }
     const plan = await BannerPlan.create(payload);
 
@@ -780,13 +779,21 @@ exports.addPlans = async (req, res) => {
 
 exports.getPlans = async (req, res) => {
   try {
-    const { includeInactive } = req.query;
+    const { includeInactive, type } = req.query;
     const filter = {};
 
     if (String(includeInactive).toLowerCase() !== "true") {
       filter.status = true;
     }
 
+    if (type === "product") {
+      const plans = await ProductPlan.find(filter).sort({ createdAt: -1 });
+      return res.status(200).json({
+        message: "Product plans fetched successfully.",
+        count: plans.length,
+        data: plans,
+      });
+    }
     const plans = await BannerPlan.find(filter).sort({ createdAt: -1 });
 
     return res.status(200).json({
@@ -804,6 +811,7 @@ exports.getPlans = async (req, res) => {
 
 exports.editPlans = async (req, res) => {
   try {
+    const { type } = req.query;
     const { planId } = req.params;
 
     const update = {};
@@ -836,6 +844,21 @@ exports.editPlans = async (req, res) => {
 
     if (!Object.keys(update).length) {
       return res.status(400).json({ message: "Nothing to update" });
+    }
+
+    if (type === "product") {
+      const plan = await ProductPlan.findByIdAndUpdate(planId, update, {
+        new: true,
+      });
+
+      if (!plan) {
+        return res.status(404).json({ message: "Plan not found" });
+      }
+
+      res.json({
+        message: "Product plan updated",
+        data: plan,
+      });
     }
 
     const plan = await BannerPlan.findByIdAndUpdate(planId, update, {
