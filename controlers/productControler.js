@@ -68,6 +68,15 @@ exports.addProduct = async (req, res) => {
         });
       }
     }
+
+    let normalizedProductType = [];
+
+    if (Array.isArray(productType)) {
+      normalizedProductType = productType;
+    } else if (productType) {
+      normalizedProductType = [productType];
+    }
+
     const newProduct = await products.create({
       name,
       description,
@@ -75,7 +84,7 @@ exports.addProduct = async (req, res) => {
       subCategory,
       price,
       address,
-      productType,
+      productType: normalizedProductType,
       paymentType,
       transactionId,
       latitude,
@@ -99,7 +108,7 @@ exports.addProduct = async (req, res) => {
           referenceModel: "product",
           referenceId: newProduct._id,
           meta: {
-            productType: productType ?? null,
+              productType: normalizedProductType.length ? normalizedProductType : null,
           },
         });
       } catch (earningError) {

@@ -11,7 +11,7 @@ const productSchema = new mongoose.Schema(
     price: Number,
     address: String,
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    productType:String,
+    productType:[String],
     productStatus: {
       type: String,
       default: "pending",

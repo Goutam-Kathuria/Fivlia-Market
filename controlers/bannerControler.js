@@ -176,7 +176,10 @@ exports.getBanner = async (req, res) => {
   try {
     await expireBanner();
 
-    const { categoryId, myAds } = req.query;
+    const {
+      // categoryId,
+      myAds,
+    } = req.query;
     const userId = req.user;
 
     // 👉 MY ADS
@@ -244,71 +247,84 @@ exports.getBanner = async (req, res) => {
     console.log(`Fetched ${allBanners.length} active banners from DB`);
     let bannersWithSubcat = attachSubCategory(allBanners);
 
-    const normalizedCategoryId = String(categoryId || "").trim();
+    // const normalizedCategoryId = String(categoryId || "").trim();
 
     // Home screen returns only home banners.
     if (!normalizedCategoryId) {
       bannersWithSubcat = bannersWithSubcat.filter((banner) =>
         isHomeBannerPlanType(banner.selectedPlanId?.type),
       );
-    } else {
-      if (!mongoose.Types.ObjectId.isValid(normalizedCategoryId)) {
-        return res.status(400).json({ message: "Invalid categoryId" });
-      }
-
-      const isMainCategory = await Category.findById(normalizedCategoryId)
-        .select("_id")
-        .lean();
-
-      const homeBanners = bannersWithSubcat.filter(
-        (banner) =>
-          isHomeBannerPlanType(banner.selectedPlanId?.type) &&
-          String(banner.mainCategory?._id || banner.mainCategory) ===
-            normalizedCategoryId,
-      );
-      
-      let categoryMatched = [];
-
-      if (isMainCategory) {
-        categoryMatched = bannersWithSubcat.filter(
-          (banner) =>
-            String(banner.mainCategory?._id || banner.mainCategory) ===
-            normalizedCategoryId,
-        );
-      } else {
-        const isSubCategory = await Category.findOne({
-          "subcat._id": normalizedCategoryId,
-        })
-          .select("_id")
-          .lean();
-
-        if (!isSubCategory) {
-          return res.status(404).json({ message: "Category not found" });
-        }
-
-        categoryMatched = bannersWithSubcat.filter(
-          (banner) =>
-            String(banner.subCategory?._id || banner.subCategory) ===
-            normalizedCategoryId,
-        );
-      }
-
-      const seenBannerIds = new Set();
-      bannersWithSubcat = [...homeBanners, ...categoryMatched].filter(
-        (banner) => {
-          const bannerId = String(banner._id);
-          if (seenBannerIds.has(bannerId)) return false;
-          seenBannerIds.add(bannerId);
-          return true;
-        },
-      );
     }
-    const matchedBanners = await getBannersWithinRadius(
+    //  else {
+    //   if (!mongoose.Types.ObjectId.isValid(normalizedCategoryId)) {
+    //     return res.status(400).json({ message: "Invalid categoryId" });
+    //   }
+
+    //   const isMainCategory = await Category.findById(normalizedCategoryId)
+    //     .select("_id")
+    //     .lean();
+
+    //   const homeBanners = bannersWithSubcat.filter(
+    //     (banner) =>
+    //       isHomeBannerPlanType(banner.selectedPlanId?.type) &&
+    //       String(banner.mainCategory?._id || banner.mainCategory) ===
+    //         normalizedCategoryId,
+    //   );
+
+    //   let categoryMatched = [];
+
+    //   if (isMainCategory) {
+    //     categoryMatched = bannersWithSubcat.filter(
+    //       (banner) =>
+    //         String(banner.mainCategory?._id || banner.mainCategory) ===
+    //         normalizedCategoryId,
+    //     );
+    //   } else {
+    //     const isSubCategory = await Category.findOne({
+    //       "subcat._id": normalizedCategoryId,
+    //     })
+    //       .select("_id")
+    //       .lean();
+
+    //     if (!isSubCategory) {
+    //       return res.status(404).json({ message: "Category not found" });
+    //     }
+
+    //     categoryMatched = bannersWithSubcat.filter(
+    //       (banner) =>
+    //         String(banner.subCategory?._id || banner.subCategory) ===
+    //         normalizedCategoryId,
+    //     );
+    //   }
+
+    //   const seenBannerIds = new Set();
+    //   bannersWithSubcat = [...homeBanners, ...categoryMatched].filter(
+    //     (banner) => {
+    //       const bannerId = String(banner._id);
+    //       if (seenBannerIds.has(bannerId)) return false;
+    //       seenBannerIds.add(bannerId);
+    //       return true;
+    //     },
+    //   );
+    // }
+    // 👉 Separate admin banners
+    const adminBanners = bannersWithSubcat.filter(
+      (banner) => banner.addedBy === "admin",
+    );
+
+    // 👉 User banners (radius based)
+    const userBanners = bannersWithSubcat.filter(
+      (banner) => banner.addedBy !== "admin",
+    );
+
+    const nearbyUserBanners = await getBannersWithinRadius(
       userLatitude,
       userLongitude,
-      bannersWithSubcat,
+      userBanners,
       radiusKm,
     );
+
+    const matchedBanners = [...adminBanners, ...nearbyUserBanners];
 
     return res.status(200).json({
       message: "Banners fetched successfully.",
@@ -499,11 +515,9 @@ exports.updateBannerStatus = async (req, res) => {
       );
 
       if (!foundSubCategory) {
-        return res
-          .status(404)
-          .json({
-            message: `SubCategory ${normalizedSubCategoryId} not found`,
-          });
+        return res.status(404).json({
+          message: `SubCategory ${normalizedSubCategoryId} not found`,
+        });
       }
 
       updateData.subCategory = foundSubCategory._id;
