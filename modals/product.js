@@ -19,6 +19,10 @@ const productSchema = new mongoose.Schema(
     },
     paymentType:{ type: String, enum: ["free", "paid"] },
     transactionId: String,
+    selectedPlanId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "product_plan",
+    },
     rating: { type: Number, default: 0 }, // average rating
     ratingCount: { type: Number, default: 0 },
     ratingSum: { type: Number, default: 0 },
@@ -35,7 +39,7 @@ const productSchema = new mongoose.Schema(
       },
     },
     expiresAt: { type: Date },
-    expiryDays: { type: Number, default: 30 },
+    expiryDays: { type: Number, default: 90 },
   },
   { timestamps: true },
 );

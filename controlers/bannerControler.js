@@ -2,6 +2,7 @@ const Banner = require("../modals/banner");
 const User = require("../modals/user");
 const Category = require("../modals/category");
 const BannerPlan = require("../modals/banner_type");
+const ProductPlan = require("../modals/product_plan");
 const Setting = require("../modals/setting");
 const mongoose = require("mongoose");
 const { getBannersWithinRadius } = require("../utils/location");
@@ -727,6 +728,8 @@ exports.updateBannerApproval = async (req, res) => {
 
 exports.addPlans = async (req, res) => {
   try {
+    const type = req.query
+
     const { duration, price, status } = req.body;
 
     const parsedDuration = Number(duration);
@@ -753,6 +756,14 @@ exports.addPlans = async (req, res) => {
       payload.status = parsedStatus;
     }
 
+    if (type === "product") {
+      const plan = await ProductPlan.create(payload);
+      return res.status(201).json({
+      message: "Product plan added successfully.",
+      data: plan,
+    });
+
+    }
     const plan = await BannerPlan.create(payload);
 
     return res.status(201).json({

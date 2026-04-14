@@ -4,6 +4,8 @@ const Users = require("../modals/user");
 const Rating = require("../modals/rating");
 const Setting = require("../modals/setting");
 const Earning = require("../modals/earning");
+const ProductPlan = require("../modals/product_plan");
+const mongoose = require("mongoose");
 const { applyLocationFilter, getDistanceKm } = require("../utils/location");
 
 const DEFAULT_PRODUCT_RADIUS_KM = 20;
@@ -43,6 +45,7 @@ exports.addProduct = async (req, res) => {
       productType,
       paymentType,
       transactionId,
+      selectedPlanId,
     } = req.body;
     const image =
       `/${req.files?.MultipleImage?.[0]?.key}` || req.body.MultipleImage || "";
@@ -50,12 +53,40 @@ exports.addProduct = async (req, res) => {
     subCategory = subCategory || null;
     userId = userId || null;
 
-    if (paymentType === "paid" && !transactionId) {
-      return res
-        .status(400)
-        .json({ message: "Transaction ID is required for paid products" });
+    // ========== PAID PRODUCT VALIDATION ==========
+    if (paymentType === "paid") {
+      if (!transactionId) {
+        return res
+          .status(400)
+          .json({ message: "Transaction ID is required for paid products" });
+      }
+
+      if (!selectedPlanId) {
+        return res
+          .status(400)
+          .json({ message: "Plan selection is required for paid products" });
+      }
+
+      if (!mongoose.Types.ObjectId.isValid(String(selectedPlanId))) {
+        return res.status(400).json({ message: "Invalid selectedPlanId" });
+      }
+
+      // Fetch and validate the plan
+      const selectedPlan = await ProductPlan.findOne({
+        _id: selectedPlanId,
+        status: true,
+      })
+        .select("_id duration status price")
+        .lean();
+
+      if (!selectedPlan) {
+        return res.status(404).json({
+          message: `Plan ${selectedPlanId} not found or inactive`,
+        });
+      }
     }
 
+    // ========== FREE PRODUCT VALIDATION ==========
     if (paymentType === "free") {
       const freeProductCount = await products.countDocuments({
         userId,
@@ -77,7 +108,8 @@ exports.addProduct = async (req, res) => {
       normalizedProductType = [productType];
     }
 
-    const newProduct = await products.create({
+    // ========== CREATE PRODUCT ==========
+    const productData = {
       name,
       description,
       category,
@@ -91,8 +123,22 @@ exports.addProduct = async (req, res) => {
       longitude,
       userId,
       image,
-    });
+    };
 
+    // ========== SET EXPIRY BASED ON PAYMENT TYPE ==========
+    if (paymentType === "paid") {
+      const selectedPlan = await ProductPlan.findById(selectedPlanId)
+        .select("duration")
+        .lean();
+      productData.selectedPlanId = selectedPlanId;
+      productData.expiryDays = selectedPlan.duration;
+    } else if (paymentType === "free") {
+      productData.expiryDays = 90; // 90 days default for free
+    }
+
+    const newProduct = await products.create(productData);
+
+    // ========== RECORD PAYMENT EARNING ==========
     if (paymentType === "paid") {
       const normalizedTransactionId = String(transactionId || "").trim();
       const settings = await Setting.findOne().select("productPrice").lean();
@@ -108,7 +154,7 @@ exports.addProduct = async (req, res) => {
           referenceModel: "product",
           referenceId: newProduct._id,
           meta: {
-              productType: normalizedProductType.length ? normalizedProductType : null,
+            productType: normalizedProductType.length ? normalizedProductType : null,
           },
         });
       } catch (earningError) {
@@ -117,6 +163,7 @@ exports.addProduct = async (req, res) => {
         }
       }
     }
+
     return res
       .status(200)
       .json({ message: "Product Added Successfully", newProduct });
@@ -391,7 +438,22 @@ exports.repostProduct = async (req, res) => {
       product.image = req.files.MultipleImage.map((f) => `/${f.key}`);
     }
 
-    // Reset expiry timer
+    // Reset expiry timer based on payment type
+    if (product.paymentType === "paid") {
+      // For paid products, use plan duration
+      if (product.selectedPlanId) {
+        const selectedPlan = await ProductPlan.findById(product.selectedPlanId)
+          .select("duration")
+          .lean();
+        if (selectedPlan) {
+          product.expiryDays = selectedPlan.duration;
+        }
+      }
+    } else if (product.paymentType === "free") {
+      // For free products, use 90 days
+      product.expiryDays = 90;
+    }
+
     const expiry = new Date();
     expiry.setDate(expiry.getDate() + product.expiryDays);
     product.expiresAt = expiry;

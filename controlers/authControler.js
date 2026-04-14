@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 const OtpModel = require("../modals/otp");
 const Product = require("../modals/product");
 const BannerPlan = require("../modals/banner_type");
+const ProductPlan = require("../modals/product_plan");
 const Banner = require("../modals/banner");
 const Setting = require("../modals/setting");
 const sendFcmPush = require("../utils/firebase/sendNotification");
@@ -37,16 +38,20 @@ exports.register = async (req, res) => {
     const message = `Dear Customer Your Fivlia Login OTP code is ${otp}. Valid for 5 minutes. Do not share with others Fivlia - Delivery in Minutes!`;
 
     try {
+      await OtpModel.create(
+        {
+          mobileNumber,
+          otp,
+          expiresAt: Date.now() + 2 * 60 * 1000,
+        },
+        { upsert: true, new: true },
+      );
+
       const response = await sendMessages(
         mobileNumber,
         message,
         "1707176060665820902",
       );
-      await OtpModel.create({
-        mobileNumber,
-        otp,
-        expiresAt: Date.now() + 2 * 60 * 1000,
-      });
       return res.status(200).json({
         status: 1,
         message: "OTP sent successfully",
@@ -73,9 +78,7 @@ exports.login = async (req, res) => {
     const { mobileNumber, fcmToken } = req.body;
 
     if (!mobileNumber) {
-      return res
-        .status(400)
-        .json({ message: "mobileNumber is required" });
+      return res.status(400).json({ message: "mobileNumber is required" });
     }
 
     const user = await User.findOne({ mobileNumber });
@@ -96,16 +99,20 @@ exports.login = async (req, res) => {
     }
 
     try {
+      await OtpModel.create(
+        {
+          mobileNumber,
+          otp,
+          expiresAt: Date.now() + 2 * 60 * 1000,
+        },
+        { upsert: true, new: true },
+      );
+
       const response = await sendMessages(
         mobileNumber,
         message,
         "1707176060665820902",
       );
-      await OtpModel.create({
-        mobileNumber,
-        otp,
-        expiresAt: Date.now() + 2 * 60 * 1000,
-      });
       return res.status(200).json({
         status: 1,
         message: "OTP sent successfully",
@@ -260,18 +267,34 @@ exports.planRenewal = async (req, res) => {
     PRODUCT RENEWAL
     */
     if (type === "product") {
-      const product = await Product.findByIdAndUpdate(
-        id,
-        {
-          productStatus: "active",
-          transactionId: normalizedTransactionId,
-        },
-        { new: true },
-      );
+      const product = await Product.findById(id);
 
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
       }
+
+      // Reset expiry based on payment type and plan
+      if (product.paymentType === "paid") {
+        if (product.selectedPlanId) {
+          const selectedPlan = await ProductPlan.findById(product.selectedPlanId)
+            .select("duration")
+            .lean();
+          if (selectedPlan) {
+            product.expiryDays = selectedPlan.duration;
+          }
+        }
+      } else if (product.paymentType === "free") {
+        product.expiryDays = 90;
+      }
+
+      // Calculate new expiry date
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + product.expiryDays);
+      product.expiresAt = expiryDate;
+
+      product.productStatus = "active";
+      product.transactionId = normalizedTransactionId;
+      await product.save();
 
       const settings = await Setting.findOne().select("productPrice").lean();
 
