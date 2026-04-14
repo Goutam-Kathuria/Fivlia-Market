@@ -5,6 +5,7 @@ const Notification = require("../modals/notification");
 const Banner = require("../modals/banner");
 const Category = require("../modals/category");
 const Earning = require("../modals/earning");
+const BannerPlan = require("../modals/banner_type");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const { getDistanceKm } = require("../utils/location");
@@ -16,7 +17,10 @@ const {
   normalizeFcmToken,
   isLikelyFcmToken,
 } = require("../utils/firebase/fcmToken");
-const { getCoordinateInputsFromBody } = require("../utils/bannerHelpers");
+const {
+  getCoordinateInputsFromBody,
+  normalizeObjectIdInput,
+} = require("../utils/bannerHelpers");
 const {
   resolveAdminBannerLocationFields,
 } = require("../utils/adminBannerHelpers");
@@ -100,13 +104,41 @@ const parseRadius = (value, fallback = 5) => {
 
 exports.addAdminBanner = async (req, res) => {
   try {
-    const { title, mainCategory, subCategory } = req.body;
+    const { title, mainCategory, subCategory, selectedPlanId } = req.body;
 
     const { latitude: latitudeInput, longitude: longitudeInput } =
       getCoordinateInputsFromBody(req.body);
 
     if (!mainCategory) {
       return res.status(400).json({ message: "Main category is required" });
+    }
+
+    if (!title || String(title).trim() === "") {
+      return res.status(400).json({ message: "Title is required" });
+    }
+
+    // Validate and normalize selectedPlanId
+    const normalizedPlanId = normalizeObjectIdInput(selectedPlanId);
+    if (!normalizedPlanId) {
+      return res.status(400).json({ message: "selectedPlanId is required" });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(normalizedPlanId)) {
+      return res.status(400).json({ message: "Invalid selectedPlanId" });
+    }
+
+    // Fetch and validate the banner plan
+    const selectedPlan = await BannerPlan.findOne({
+      _id: normalizedPlanId,
+      status: true,
+    })
+      .select("_id duration status price")
+      .lean();
+
+    if (!selectedPlan) {
+      return res.status(404).json({
+        message: `Plan ${normalizedPlanId} not found or inactive`,
+      });
     }
 
     const now = new Date();
@@ -147,18 +179,19 @@ exports.addAdminBanner = async (req, res) => {
         .json({ message: locationResolution.error.message });
     }
 
-    const toDate = getBannerExpiryDate(now);
+    // Calculate toDate based on plan duration (in months)
+    const toDate = new Date(now);
+    toDate.setMonth(toDate.getMonth() + selectedPlan.duration);
 
     const banner = await Banner.create({
       image,
       title,
       ...locationResolution.fields,
       userId: null,
-      selectedPlanId: null,
       aprroveStatus: "active",
       approvalReason: "",
       approvedAt: now,
-      selectedPlanId: "69b92e7d60abe84e9d3c5859",
+      selectedPlanId: normalizedPlanId,
       fromDate: now,
       toDate,
       status: true,
@@ -191,6 +224,7 @@ exports.adminSetting = async (req, res) => {
       radius,
       productPrice,
       razor_pay_key,
+      expiryReminderDays,
     } = req.body;
     const rawImagePath = req.files?.image?.[0]?.key;
 
@@ -230,6 +264,14 @@ exports.adminSetting = async (req, res) => {
         return res.status(400).json({ message: "Invalid productPrice" });
       }
       updateData.productPrice = parsed;
+    }
+
+    if (expiryReminderDays !== undefined) {
+      const parsed = Number(expiryReminderDays);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        return res.status(400).json({ message: "Invalid expiryReminderDays" });
+      }
+      updateData.expiryReminderDays = parsed;
     }
 
     if (rawImagePath) {

@@ -11,6 +11,7 @@ const settingSchemma = new mongoose.Schema(
     image:String,
     productPrice:Number,
     razor_pay_key:String,
+    expiryReminderDays:{ type: Number, default: 1 },
   },
   { timestamps: true }
 );

@@ -12,16 +12,12 @@ const {
   attachBannerEarnings,
 } = require("../utils/bannerEarnings");
 const {
-  CATEGORY_BANNER_PLAN_TYPE,
   parseBooleanInput,
   parseRadius,
   normalizeObjectIdInput,
   parseCoordinateInput,
   getCoordinateInputsFromBody,
   resolveBannerCoordinates,
-  normalizePlanType,
-  isCategoryBannerPlanType,
-  isHomeBannerPlanType,
   normalizeProductIds,
   getBannerExpiryDate,
   attachSubCategory,
@@ -75,7 +71,7 @@ exports.banner = async (req, res) => {
       _id: normalizedPlanId,
       status: true,
     })
-      .select("_id type status price")
+      .select("_id duration status price")
       .lean();
     if (!selectedPlan) {
       return res
@@ -194,7 +190,7 @@ exports.getBanner = async (req, res) => {
         })
         .populate({
           path: "selectedPlanId",
-          select: "type price",
+          select: "duration price",
         })
         .lean()
         .sort({ createdAt: -1 });
@@ -239,7 +235,7 @@ exports.getBanner = async (req, res) => {
       })
       .populate({
         path: "selectedPlanId",
-        select: "type price",
+        select: "duration price",
       })
       .lean()
       .sort({ createdAt: -1 });
@@ -247,14 +243,12 @@ exports.getBanner = async (req, res) => {
     console.log(`Fetched ${allBanners.length} active banners from DB`);
     let bannersWithSubcat = attachSubCategory(allBanners);
 
-    // const normalizedCategoryId = String(categoryId || "").trim();
-
-    // Home screen returns only home banners.
-    if (!normalizedCategoryId) {
-      bannersWithSubcat = bannersWithSubcat.filter((banner) =>
-        isHomeBannerPlanType(banner.selectedPlanId?.type),
-      );
-    }
+    // Home screen returns all banners now.
+    // if (!normalizedCategoryId) {
+    //   bannersWithSubcat = bannersWithSubcat.filter((banner) =>
+    //     isHomeBannerPlanType(banner.selectedPlanId?.type),
+    //   );
+    // }
     //  else {
     //   if (!mongoose.Types.ObjectId.isValid(normalizedCategoryId)) {
     //     return res.status(400).json({ message: "Invalid categoryId" });
@@ -419,7 +413,7 @@ exports.updateBannerStatus = async (req, res) => {
         _id: normalizedPlanId,
         status: true,
       })
-        .select("_id type")
+        .select("_id duration")
         .lean();
       if (!resolvedSelectedPlan) {
         return res
@@ -431,11 +425,11 @@ exports.updateBannerStatus = async (req, res) => {
       selectedPlan = resolvedSelectedPlan;
     } else if (existingBanner.selectedPlanId) {
       selectedPlan = await BannerPlan.findById(existingBanner.selectedPlanId)
-        .select("_id type")
+        .select("_id duration")
         .lean();
     }
 
-    const requiresCategory = isCategoryBannerPlanType(selectedPlan?.type);
+    const requiresCategory = true;
     const isMainCategoryProvided = req.body.mainCategory !== undefined;
     const isSubCategoryProvided = req.body.subCategory !== undefined;
     const normalizedMainCategoryId = normalizeObjectIdInput(
@@ -527,13 +521,13 @@ exports.updateBannerStatus = async (req, res) => {
     if (requiresCategory) {
       if (!resolvedMainCategoryId) {
         return res.status(400).json({
-          message: `${CATEGORY_BANNER_PLAN_TYPE} requires mainCategory`,
+          message: "Banner requires mainCategory",
         });
       }
 
       if (!resolvedSubCategoryId) {
         return res.status(400).json({
-          message: `${CATEGORY_BANNER_PLAN_TYPE} requires subCategory`,
+          message: "Banner requires subCategory",
         });
       }
     }
@@ -628,7 +622,7 @@ exports.getAllBanner = async (req, res) => {
       // Plan details
       .populate({
         path: "selectedPlanId",
-        select: "type price",
+        select: "duration price",
       })
       .lean();
 
@@ -668,7 +662,7 @@ exports.updateBannerApproval = async (req, res) => {
       const selectedPlan = await BannerPlan.findById(
         existingBanner.selectedPlanId,
       )
-        .select("_id status")
+        .select("_id duration status")
         .lean();
 
       if (!selectedPlan) {
@@ -682,7 +676,7 @@ exports.updateBannerApproval = async (req, res) => {
       }
 
       const now = new Date();
-      const toDate = getBannerExpiryDate(now);
+      const toDate = getBannerExpiryDate(now, selectedPlan.duration);
 
       updateData.status = true;
       updateData.approvalReason = "";
@@ -733,11 +727,11 @@ exports.updateBannerApproval = async (req, res) => {
 
 exports.addPlans = async (req, res) => {
   try {
-    const { type, price, status } = req.body;
+    const { duration, price, status } = req.body;
 
-    const normalizedType = normalizePlanType(type);
-    if (!normalizedType) {
-      return res.status(400).json({ message: "Valid plan type is required" });
+    const parsedDuration = Number(duration);
+    if (!Number.isFinite(parsedDuration) || parsedDuration <= 0) {
+      return res.status(400).json({ message: "Valid duration is required" });
     }
 
     const parsedPrice = Number(price);
@@ -751,7 +745,7 @@ exports.addPlans = async (req, res) => {
     }
 
     const payload = {
-      type: normalizedType,
+      duration: parsedDuration,
       price: parsedPrice,
     };
 
@@ -803,12 +797,12 @@ exports.editPlans = async (req, res) => {
 
     const update = {};
 
-    if (req.body.type !== undefined) {
-      const normalizedType = normalizePlanType(req.body.type);
-      if (!normalizedType) {
-        return res.status(400).json({ message: "Invalid plan type" });
+    if (req.body.duration !== undefined) {
+      const duration = Number(req.body.duration);
+      if (!Number.isFinite(duration) || duration <= 0) {
+        return res.status(400).json({ message: "Invalid duration" });
       }
-      update.type = normalizedType;
+      update.duration = duration;
     }
 
     if (req.body.price !== undefined) {

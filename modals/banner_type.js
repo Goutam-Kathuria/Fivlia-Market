@@ -1,14 +1,9 @@
 const mongoose = require("mongoose");
-const {
-  HOME_BANNER_PLAN_TYPE,
-  CATEGORY_BANNER_PLAN_TYPE,
-} = require("../utils/bannerHelpers");
 
 const bannerPlanSchemma = new mongoose.Schema(
   {
-    type: {
-      type: String,
-      enum: [HOME_BANNER_PLAN_TYPE, CATEGORY_BANNER_PLAN_TYPE],
+    duration: {
+      type: Number,
       required: true,
     },
     price: { type: Number, required: true },

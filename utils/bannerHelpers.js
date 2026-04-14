@@ -2,8 +2,6 @@ const mongoose = require("mongoose");
 
 const DEFAULT_BANNER_DURATION_DAYS = 30;
 const MILLISECONDS_IN_A_DAY = 24 * 60 * 60 * 1000;
-const HOME_BANNER_PLAN_TYPE = "Homepage";
-const CATEGORY_BANNER_PLAN_TYPE = "Category";
 
 const parseBooleanInput = (value) => {
   if (value === undefined || value === null || value === "") return undefined;
@@ -154,47 +152,6 @@ const attachSubCategory = (banners = []) =>
     };
   });
 
-const normalizePlanType = (value) => {
-  if (value === undefined || value === null) return null;
-  const raw = String(value).trim();
-  if (!raw) return null;
-
-  const lowered = raw.toLowerCase();
-  if (
-    lowered === HOME_BANNER_PLAN_TYPE.toLowerCase() ||
-    lowered === "home" ||
-    lowered === "home banner" ||
-    lowered === "home-banner" ||
-    lowered === "home_banner" ||
-    lowered === "homebanner"
-  ) {
-    return HOME_BANNER_PLAN_TYPE;
-  }
-
-  if (
-    lowered === CATEGORY_BANNER_PLAN_TYPE.toLowerCase() ||
-    lowered === "category" ||
-    lowered === "category banner" ||
-    lowered === "category-banner" ||
-    lowered === "category_banner" ||
-    lowered === "categorybanner" ||
-    lowered === "subcategory" ||
-    lowered === "sub-category" ||
-    lowered === "sub_category" ||
-    lowered === "subcat"
-  ) {
-    return CATEGORY_BANNER_PLAN_TYPE;
-  }
-
-  return null;
-};
-
-const isHomeBannerPlanType = (value) =>
-  normalizePlanType(value) === HOME_BANNER_PLAN_TYPE;
-
-const isCategoryBannerPlanType = (value) =>
-  normalizePlanType(value) === CATEGORY_BANNER_PLAN_TYPE;
-
 const normalizeArrayInput = (value) => {
   if (value === undefined || value === null || value === "") return [];
   if (Array.isArray(value)) return value;
@@ -259,13 +216,11 @@ const normalizeProductIds = (value, { required = false } = {}) => {
   return { productIds };
 };
 
-const getBannerExpiryDate = (fromDate = new Date()) =>
-  new Date(fromDate.getTime() + DEFAULT_BANNER_DURATION_DAYS * MILLISECONDS_IN_A_DAY);
+const getBannerExpiryDate = (fromDate = new Date(), duration = DEFAULT_BANNER_DURATION_DAYS) =>
+  new Date(fromDate.getTime() + duration * MILLISECONDS_IN_A_DAY);
 
 module.exports = {
   DEFAULT_BANNER_DURATION_DAYS,
-  HOME_BANNER_PLAN_TYPE,
-  CATEGORY_BANNER_PLAN_TYPE,
   parseBooleanInput,
   parseRadius,
   normalizeObjectIdInput,
@@ -273,9 +228,6 @@ module.exports = {
   getCoordinateInputsFromBody,
   resolveBannerCoordinates,
   getCategoryIdString,
-  normalizePlanType,
-  isHomeBannerPlanType,
-  isCategoryBannerPlanType,
   normalizeProductIds,
   getBannerExpiryDate,
   attachSubCategory,
