@@ -4,15 +4,19 @@ const products = require("../modals/product");
 async function deleteOldProducts() {
   const now = new Date();
 
-  // 90 days ago
-  const threeMonthsAgo = new Date();
-  threeMonthsAgo.setDate(threeMonthsAgo.getDate() - 90);
+  // 1 month ago (30 days)
+  const oneMonthAgo = new Date();
+  oneMonthAgo.setDate(oneMonthAgo.getDate() - 30);
 
+  // Delete products that:
+  // 1. Are expired (productStatus = "expired")
+  // 2. Have been expired for at least 1 month (expiresAt <= 1 month ago)
   const deleted = await products.deleteMany({
-    createdAt: { $lte: threeMonthsAgo },
+    productStatus: "expired",
+    expiresAt: { $lte: oneMonthAgo },
   });
 
-  console.log(`🗑 Deleted ${deleted.deletedCount} old products`);
+  console.log(`🗑 Deleted ${deleted.deletedCount} expired products (after 1 month grace period)`);
 }
 
 module.exports = deleteOldProducts;

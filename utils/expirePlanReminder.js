@@ -1,6 +1,5 @@
 const Product = require("../modals/product");
 const Banner = require("../modals/banner");
-const User = require("../modals/user");
 const UserNotification = require("../modals/userNotification");
 const Setting = require("../modals/setting");
 const sendFcmPush = require("./firebase/sendNotification");
@@ -19,15 +18,18 @@ async function expirePlanReminder() {
     }
 
     const now = new Date();
-    const reminderFromDate = new Date(now.getTime() + reminderDays * 24 * 60 * 60 * 1000);
-    const reminderToDate = new Date(reminderFromDate.getTime() + 24 * 60 * 60 * 1000);
+    // Calculate the date N days from now (where N = reminderDays)
+    const reminderThresholdDate = new Date(now.getTime() + reminderDays * 24 * 60 * 60 * 1000);
 
     let reminderCount = 0;
 
     // ========== CHECK PRODUCTS ==========
+    // Find products that:
+    // 1. Are active (productStatus = "active")
+    // 2. Will expire within the next N days (now < expiresAt <= reminderThresholdDate)
     const expiringProducts = await Product.find({
       productStatus: "active",
-      expiresAt: { $gte: reminderFromDate, $lt: reminderToDate },
+      expiresAt: { $gt: now, $lte: reminderThresholdDate },
     })
       .select("_id userId name expiresAt")
       .populate("userId", "_id fcmToken")
@@ -71,10 +73,13 @@ async function expirePlanReminder() {
     }
 
     // ========== CHECK BANNERS ==========
+    // Find banners that:
+    // 1. Are approved and active (aprroveStatus = "active", status = true)
+    // 2. Will expire within the next N days (now < toDate <= reminderThresholdDate)
     const expiringBanners = await Banner.find({
       aprroveStatus: "active",
       status: true,
-      toDate: { $gte: reminderFromDate, $lt: reminderToDate },
+      toDate: { $gt: now, $lte: reminderThresholdDate },
     })
       .select("_id userId title toDate")
       .populate("userId", "_id fcmToken")
