@@ -34,14 +34,9 @@ const resolveAdminBannerLocationFields = async ({
   let latitude = hasLatitudeInput ? parsedLatitude : undefined;
   let longitude = hasLongitudeInput ? parsedLongitude : undefined;
 
+  // Location fields are optional for admin banners
   if (latitude === undefined || longitude === undefined) {
-    return {
-      error: {
-        status: 400,
-        message:
-          "latitude and longitude are required. You can also provide a cityId with valid coordinates",
-      },
-    };
+    return { fields };
   }
 
   if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) {
