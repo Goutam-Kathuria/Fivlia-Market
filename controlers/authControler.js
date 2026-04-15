@@ -20,6 +20,16 @@ exports.register = async (req, res) => {
   try {
     const { name, mobileNumber, email, adharCardNumber } = req.body;
 
+    const user = await User.findOne({
+      $or: [{ mobileNumber }, { email }],
+    });
+    
+    if (user) {
+      return res
+        .status(400)
+        .json({ message: "User already exists please login" });
+    }
+
     const adharFrontImage = `/${req.files?.image?.[0]?.key ? req.files?.image?.[0]?.key : ""}`;
     const adharBackImage = `/${req.files?.MultipleImage?.[0]?.key ? req.files?.MultipleImage?.[0]?.key : ""}`;
     await User.create({
@@ -276,7 +286,9 @@ exports.planRenewal = async (req, res) => {
       // Reset expiry based on payment type and plan
       if (product.paymentType === "paid") {
         if (product.selectedPlanId) {
-          const selectedPlan = await ProductPlan.findById(product.selectedPlanId)
+          const selectedPlan = await ProductPlan.findById(
+            product.selectedPlanId,
+          )
             .select("duration")
             .lean();
           if (selectedPlan) {
@@ -284,7 +296,9 @@ exports.planRenewal = async (req, res) => {
           }
         }
       } else if (product.paymentType === "free") {
-        const settings = await Setting.findOne().select("freeProductExpiryDays").lean();
+        const settings = await Setting.findOne()
+          .select("freeProductExpiryDays")
+          .lean();
         product.expiryDays = settings?.freeProductExpiryDays ?? 90;
       }
 
