@@ -794,7 +794,7 @@ exports.getPlans = async (req, res) => {
         data: plans,
       });
     }
-    const plans = await BannerPlan.find(filter).sort({ createdAt: -1 });
+    const plans = await BannerPlan.find(filter);
 
     return res.status(200).json({
       message: "Banner plans fetched successfully.",
