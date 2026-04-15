@@ -384,7 +384,7 @@ exports.getAppSetting = async (req, res) => {
   try {
     const settings = await setting
       .findOne()
-      .select("term_and_conditons safety_and_policy razor_pay_key")
+      .select("term_and_conditons safety_and_policy razor_pay_key radius")
       .lean();
 
     return res.status(200).json({
@@ -393,6 +393,7 @@ exports.getAppSetting = async (req, res) => {
         term_and_conditions: settings?.term_and_conditons ?? "",
         safety_and_policy: settings?.safety_and_policy ?? "",
         razor_pay_key: settings?.razor_pay_key ?? "",
+        radius: settings?.radius ?? 20,
       },
     });
   } catch (error) {
