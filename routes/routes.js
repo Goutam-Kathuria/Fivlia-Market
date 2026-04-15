@@ -38,6 +38,7 @@ const {
   sendNotification,
   addAdminBanner,
   addFilter,
+  editFilter,
   deleteFilter,
   getAllFilters
 } = require("../controlers/adminControler");
@@ -82,6 +83,7 @@ router.post("/send-chat-notification", sendChatNotification);
 router.post("/admin/update-setting", upload, adminSetting);
 router.post("/admin/addBanner", verifyAdminToken, upload, addAdminBanner);
 router.post("/admin/add-filter", verifyAdminToken, addFilter);
+router.post("/admin/edit-filter/:id", verifyAdminToken, editFilter);
 router.delete("/admin/delete-filter/:id", verifyAdminToken, deleteFilter);
 router.get("/admin/get-all-filters", verifyAdminToken, getAllFilters);
 

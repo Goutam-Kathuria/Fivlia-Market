@@ -863,6 +863,55 @@ exports.addFilter = async (req, res) => {
   }
 };
 
+exports.editFilter = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { filter, categoryId, subCategoryId } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid filter ID" });
+    }
+
+    const updateData = {};
+
+    if (filter !== undefined) {
+      updateData.filter = filter;
+    }
+
+    if (categoryId !== undefined) {
+      updateData.categoryId = categoryId;
+    }
+
+    if (subCategoryId !== undefined) {
+      updateData.subCategoryId = subCategoryId || null;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        message: "No valid fields provided for update",
+      });
+    }
+
+    const updatedFilter = await Filter.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true, runValidators: true },
+    );
+
+    if (!updatedFilter) {
+      return res.status(404).json({ message: "Filter not found" });
+    }
+
+    return res.status(200).json({
+      message: "Filter updated successfully",
+      data: updatedFilter,
+    });
+  } catch (error) {
+    console.error("Edit Filter Error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
 exports.getAllFilters = async (req, res) => {
   try {
     const filters = await Filter.find().lean();
