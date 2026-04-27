@@ -948,3 +948,26 @@ exports.deleteFilter = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+
+exports.deleteNotificationAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid notification ID" });
+    }
+
+    const deletedNotification = await Notification.findByIdAndDelete(id);
+
+    if (!deletedNotification) {
+      return res.status(404).json({ message: "Notification not found" });
+    }
+
+    return res.status(200).json({
+      message: "Notification deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete Notification Error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};

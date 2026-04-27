@@ -35,6 +35,7 @@ const {
   createNotification,
   editNotification,
   getNotifications,
+  deleteNotificationAdmin,
   sendNotification,
   addAdminBanner,
   addFilter,
@@ -144,6 +145,7 @@ router.get("/get-app-setting", getAppSetting);
 router.post("/create-notification", upload, createNotification);
 router.post("/edit-notification/:id", upload, editNotification);
 router.get("/get-notification", getNotifications);
+router.delete("/delete-notification/:id", verifyAdminToken, deleteNotificationAdmin);
 router.post("/send-notification", sendNotification);
 
 router.post("/delete-notification", verifyToken, deleteNotification)
