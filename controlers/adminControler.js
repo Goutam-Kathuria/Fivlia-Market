@@ -225,6 +225,7 @@ exports.adminSetting = async (req, res) => {
       razor_pay_key,
       expiryReminderDays,
       freeProductExpiryDays,
+      inquiry_number
     } = req.body;
     const rawImagePath = req.files?.image?.[0]?.key;
 
@@ -244,6 +245,10 @@ exports.adminSetting = async (req, res) => {
 
     if (term_and_conditons !== undefined) {
       updateData.term_and_conditons = term_and_conditons;
+    }
+
+    if(inquiry_number !== undefined){
+      updateData.inquiry_number = inquiry_number;
     }
 
     if (safety_and_policy !== undefined) {
@@ -384,7 +389,7 @@ exports.getAppSetting = async (req, res) => {
   try {
     const settings = await setting
       .findOne()
-      .select("term_and_conditons safety_and_policy razor_pay_key radius")
+      .select("term_and_conditons safety_and_policy razor_pay_key radius inquiry_number")
       .lean();
 
     return res.status(200).json({
@@ -394,6 +399,7 @@ exports.getAppSetting = async (req, res) => {
         safety_and_policy: settings?.safety_and_policy ?? "",
         razor_pay_key: settings?.razor_pay_key ?? "",
         radius: settings?.radius ?? 20,
+        inquiry_number: settings?.inquiry_number ?? "",
       },
     });
   } catch (error) {
