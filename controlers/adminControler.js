@@ -980,8 +980,14 @@ exports.deleteNotificationAdmin = async (req, res) => {
 
 exports.getHelpForms = async (req, res) => {
   try {
-    const helpForms = await HelpForm
-      .find()
+    const { status } = req.query;
+    const query = {};
+
+    if (status) {
+      query.status = String(status).trim().toLowerCase();
+    }
+
+    const helpForms = await HelpForm.find(query)
       .populate("userId", "name email mobileNumber")
       .sort({ createdAt: -1 })
       .lean();
@@ -992,6 +998,46 @@ exports.getHelpForms = async (req, res) => {
     });
   } catch (error) {
     console.error("Get Help Forms Error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.updateHelpFormStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid help form ID" });
+    }
+
+    const normalizedStatus = String(status || "").trim().toLowerCase();
+    const allowedStatuses = ["pending", "completed"];
+
+    if (!allowedStatuses.includes(normalizedStatus)) {
+      return res.status(400).json({
+        message: `Invalid status. Allowed values: ${allowedStatuses.join(", ")}`,
+      });
+    }
+
+    const updatedHelpForm = await HelpForm.findByIdAndUpdate(
+      id,
+      { $set: { status: normalizedStatus } },
+      { new: true, runValidators: true },
+    )
+      .populate("userId", "name email mobileNumber")
+      .lean();
+
+    if (!updatedHelpForm) {
+      return res.status(404).json({ message: "Help form not found" });
+    }
+
+    return res.status(200).json({
+      message: "Help form status updated successfully",
+      data: updatedHelpForm,
+    });
+  } catch (error) {
+    console.error("Update Help Form Status Error:", error);
     return res.status(500).json({ message: "Server error" });
   }
 };

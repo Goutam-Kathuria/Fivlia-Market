@@ -42,7 +42,8 @@ const {
   editFilter,
   deleteFilter,
   getAllFilters,
-  getHelpForms
+  getHelpForms,
+  updateHelpFormStatus,
 } = require("../controlers/adminControler");
 
 // ---------------- AUTH ROUTES ----------------
@@ -156,4 +157,9 @@ router.get("/get-user-notification", verifyToken, getUserNotifications);
 
 router.post("/contact-us", verifyToken, contactUsForm);
 router.get("/admin/get-help-forms", verifyAdminToken, getHelpForms);
+router.patch(
+  "/admin/update-help-form-status/:id",
+  verifyAdminToken,
+  updateHelpFormStatus,
+);
 module.exports = router;
