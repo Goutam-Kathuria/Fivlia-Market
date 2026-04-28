@@ -41,7 +41,8 @@ const {
   addFilter,
   editFilter,
   deleteFilter,
-  getAllFilters
+  getAllFilters,
+  getHelpForms
 } = require("../controlers/adminControler");
 
 // ---------------- AUTH ROUTES ----------------
@@ -57,6 +58,7 @@ const {
   sendChatNotification,
   deleteNotification,
   getUserNotifications,
+  contactUsForm
 } = require("../controlers/authControler");
 const {
   addProduct,
@@ -151,4 +153,7 @@ router.post("/send-notification", sendNotification);
 router.post("/delete-notification", verifyToken, deleteNotification)
 
 router.get("/get-user-notification", verifyToken, getUserNotifications);
+
+router.post("/contact-us", verifyToken, contactUsForm);
+router.get("/admin/get-help-forms", verifyAdminToken, getHelpForms);
 module.exports = router;

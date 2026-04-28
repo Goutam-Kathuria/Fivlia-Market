@@ -12,7 +12,7 @@ const { getDistanceKm } = require("../utils/location");
 const sendFcmPush = require("../utils/firebase/sendNotification");
 const Filter = require("../modals/filter");
 const UserNotification = require("../modals/userNotification");
-
+const HelpForm = require("../modals/help_form")
 const {
   normalizeFcmToken,
   isLikelyFcmToken,
@@ -974,6 +974,24 @@ exports.deleteNotificationAdmin = async (req, res) => {
     });
   } catch (error) {
     console.error("Delete Notification Error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.getHelpForms = async (req, res) => {
+  try {
+    const helpForms = await HelpForm
+      .find()
+      .populate("userId", "name email mobileNumber")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.status(200).json({
+      message: "Help forms fetched successfully",
+      data: helpForms,
+    });
+  } catch (error) {
+    console.error("Get Help Forms Error:", error);
     return res.status(500).json({ message: "Server error" });
   }
 };

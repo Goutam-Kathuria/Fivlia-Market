@@ -10,6 +10,7 @@ const sendFcmPush = require("../utils/firebase/sendNotification");
 const { recordBannerEarning } = require("../utils/bannerEarnings");
 const UserNotification = require("../modals/userNotification");
 const { sendMessages } = require("../utils/sendMessages");
+const HelpForm = require("../modals/help_form")
 
 const {
   normalizeFcmToken,
@@ -461,4 +462,25 @@ exports.getUserNotifications = async (req, res) => {
     data: notifications,
     unreadCount,
   });
+};
+
+exports.contactUsForm = async (req, res) => {
+  try {
+    const userId = req.user;
+    const { title, message } = req.body;
+    
+    const request = await HelpForm.create({
+      title,
+      message,
+      userId,
+    });
+
+    return res.status(200).json({
+      message: "Request submitted successfully",
+      data: request,
+    });
+  } catch (error) {
+    console.error("Error submitting contact us form:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
 };
