@@ -576,6 +576,25 @@ exports.updateBannerStatus = async (req, res) => {
       updateData.approvedAt = null;
     }
 
+    // Reactivate expired banner
+    if (
+      existingBanner.aprroveStatus === "expired" &&
+      updateData.status === true
+    ) {
+      updateData.aprroveStatus = "active";
+
+      if (selectedPlan?.duration) {
+        const now = new Date();
+
+        updateData.fromDate = now;
+
+        const expiry = new Date(now);
+        expiry.setMonth(expiry.getMonth() + Number(selectedPlan.duration));
+
+        updateData.toDate = expiry;
+      }
+    }
+
     const updatedBanner = await Banner.findByIdAndUpdate(
       id,
       { $set: updateData },
