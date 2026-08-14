@@ -69,6 +69,7 @@ const {
   updateProductStatus,
   editProduct,
   repostProduct,
+  repostAdminProduct,
   getProductForApprovals,
   rateProduct,
   deleteProduct,
@@ -126,6 +127,7 @@ router.get("/get-public-listing", verifyToken, getPublicListing);
 router.post("/update-product-status/:productId", verifyAdminToken, updateProductStatus);
 router.post("/edit-product/:productId", upload, editProduct);
 router.post("/repost-product/:productId", upload, repostProduct);
+router.post("/admin/repost-product/:productId", verifyAdminToken, repostAdminProduct);
 router.get("/get-product-for-approvals", verifyAdminToken, getProductForApprovals);
 router.get("/get-user-category-wise-products", verifyToken, getUserCategoryWiseProducts);
 router.get("/get-user-products/:bannerId", getUserProducts);

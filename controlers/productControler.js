@@ -534,6 +534,45 @@ exports.repostProduct = async (req, res) => {
   }
 };
 
+exports.repostAdminProduct = async (req, res) => {
+  try {
+    const { productId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(String(productId))) {
+      return res.status(400).json({ message: "Invalid product id" });
+    }
+
+    const product = await products.findById(productId);
+    if (!product) return res.status(404).json({ message: "Product not found" });
+
+    if (product.productStatus !== "expired") {
+      return res.status(400).json({ message: "Only expired products can be reposted" });
+    }
+
+    if (product.paymentType === "free") {
+      const settings = await Setting.findOne().select("freeProductExpiryDays").lean();
+      product.expiryDays = settings?.freeProductExpiryDays ?? 90;
+    } else if (product.paymentType === "paid" && product.selectedPlanId) {
+      const selectedPlan = await ProductPlan.findById(product.selectedPlanId)
+        .select("duration")
+        .lean();
+      if (selectedPlan?.duration > 0) product.expiryDays = selectedPlan.duration;
+    }
+
+    product.productStatus = "active";
+    await product.save();
+
+    return res.status(200).json({
+      message: "Product reposted and activated successfully",
+      productStatus: product.productStatus,
+      expiresAt: product.expiresAt,
+    });
+  } catch (error) {
+    console.error("Admin repost product error:", error);
+    return res.status(500).json({ message: "Failed to repost product", error: error.message });
+  }
+};
+
 exports.getPublicListing = async (req, res) => {
   try {
     const userId = req.user;
