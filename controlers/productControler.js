@@ -1,6 +1,7 @@
 const products = require("../modals/product");
 const banner = require("../modals/banner");
 const Users = require("../modals/user");
+const Category = require("../modals/category");
 const Rating = require("../modals/rating");
 const Setting = require("../modals/setting");
 const Earning = require("../modals/earning");
@@ -354,6 +355,60 @@ exports.updateProductStatus = async (req, res) => {
   }
 };
 
+exports.addAdminProduct = async (req, res) => {
+  try {
+    const { name, description, category, subCategory, price, address } = req.body;
+    const normalizedName = String(name || "").trim();
+    const normalizedPrice = Number(price);
+
+    if (!normalizedName) return res.status(400).json({ message: "Product name is required" });
+    if (!Number.isFinite(normalizedPrice) || normalizedPrice < 0) {
+      return res.status(400).json({ message: "A valid product price is required" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(String(category))) {
+      return res.status(400).json({ message: "A valid category is required" });
+    }
+
+    const selectedCategory = await Category.findById(category).select("_id subcat").lean();
+    if (!selectedCategory) return res.status(404).json({ message: "Category not found" });
+
+    let normalizedSubCategory = null;
+    if (subCategory) {
+      if (!mongoose.Types.ObjectId.isValid(String(subCategory))) {
+        return res.status(400).json({ message: "Invalid subcategory" });
+      }
+      const isValidSubCategory = selectedCategory.subcat.some(
+        (sub) => String(sub._id) === String(subCategory),
+      );
+      if (!isValidSubCategory) {
+        return res.status(400).json({ message: "Subcategory does not belong to the selected category" });
+      }
+      normalizedSubCategory = subCategory;
+    }
+
+    const settings = await Setting.findOne().select("freeProductExpiryDays").lean();
+    const image = (req.files?.MultipleImage || []).map((file) => `/${file.key}`);
+    const product = await products.create({
+      name: normalizedName,
+      description: String(description || "").trim(),
+      category: selectedCategory._id,
+      subCategory: normalizedSubCategory,
+      price: normalizedPrice,
+      address: String(address || "").trim(),
+      image,
+      userId: null,
+      paymentType: "free",
+      productStatus: "active",
+      expiryDays: settings?.freeProductExpiryDays ?? 90,
+    });
+
+    return res.status(201).json({ message: "Admin product added successfully", product });
+  } catch (error) {
+    console.error("Add admin product error:", error);
+    return res.status(500).json({ message: "Failed to add admin product", error: error.message });
+  }
+};
+
 exports.editProduct = async (req, res) => {
   try {
     const { productId } = req.params;
@@ -648,6 +703,32 @@ exports.deleteProduct = async (req, res) => {
       message: "Failed to delete product",
       error: error.message,
     });
+  }
+};
+
+exports.deleteAdminProduct = async (req, res) => {
+  try {
+    const { productId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(String(productId))) {
+      return res.status(400).json({ message: "Invalid product id" });
+    }
+
+    const deletedProduct = await products.findByIdAndDelete(productId);
+    if (!deletedProduct) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    // Keep banner product references valid after an admin deletes a product.
+    await banner.updateMany(
+      { productId },
+      { $pull: { productId } },
+    );
+
+    return res.status(200).json({ message: "Product deleted successfully" });
+  } catch (error) {
+    console.error("Delete admin product error:", error);
+    return res.status(500).json({ message: "Failed to delete product", error: error.message });
   }
 };
 

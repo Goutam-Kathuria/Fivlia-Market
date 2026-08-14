@@ -45,11 +45,25 @@ const productSchema = new mongoose.Schema(
 );
 
 productSchema.pre("save", function (next) {
-  if (this.latitude && this.longitude) {
+  const latitude = Number(this.latitude);
+  const longitude = Number(this.longitude);
+  const hasValidCoordinates =
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    latitude >= -90 &&
+    latitude <= 90 &&
+    longitude >= -180 &&
+    longitude <= 180;
+
+  if (hasValidCoordinates) {
     this.location = {
       type: "Point",
-      coordinates: [this.longitude, this.latitude],
+      coordinates: [longitude, latitude],
     };
+  } else {
+    // The 2dsphere index rejects an incomplete GeoJSON Point. Admin-created
+    // products have no coordinates, so omit the location field entirely.
+    this.set("location", undefined);
   }
 
   // Only assign expiry when product becomes ACTIVE

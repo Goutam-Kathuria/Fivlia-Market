@@ -63,6 +63,7 @@ const {
 } = require("../controlers/authControler");
 const {
   addProduct,
+  addAdminProduct,
   getProduct,
   getPublicListing,
   updateProductStatus,
@@ -71,6 +72,7 @@ const {
   getProductForApprovals,
   rateProduct,
   deleteProduct,
+  deleteAdminProduct,
   getUserCategoryWiseProducts,
   getUserProducts,
 } = require("../controlers/productControler");
@@ -118,6 +120,7 @@ router.get("/get-filters", getFilters);
 
 // ---------------- PRODUCT ROUTES ----------------
 router.post("/addProduct", upload, verifyToken, addProduct);
+router.post("/admin/addProduct", verifyAdminToken, upload, addAdminProduct);
 router.get("/getProduct", getProduct);
 router.get("/get-public-listing", verifyToken, getPublicListing);
 router.post("/update-product-status/:productId", verifyAdminToken, updateProductStatus);
@@ -128,6 +131,7 @@ router.get("/get-user-category-wise-products", verifyToken, getUserCategoryWiseP
 router.get("/get-user-products/:bannerId", getUserProducts);
 router.post("/rate-product/:productId", verifyToken, rateProduct);
 router.delete("/delete-product/:productId", verifyToken, deleteProduct);
+router.delete("/admin/delete-product/:productId", verifyAdminToken, deleteAdminProduct);
 // ---------------- BANNER ROUTES ----------------
 // Add or Update BANNER
 router.post("/addBanner", verifyToken, upload, banner);
