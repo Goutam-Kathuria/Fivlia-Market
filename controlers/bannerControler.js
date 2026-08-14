@@ -807,9 +807,15 @@ exports.getPlans = async (req, res) => {
 
     if (type === "product") {
       const plans = await ProductPlan.find(filter).sort({ createdAt: -1 });
+
+      const productSettings = await ProductSetting.findOne()
+        .select("freeProductExpiryDays")
+        .lean();
+
       return res.status(200).json({
         message: "Product plans fetched successfully.",
         count: plans.length,
+        freeProductExpiryDays: productSettings?.freeProductExpiryDays ?? 0,
         data: plans,
       });
     }
