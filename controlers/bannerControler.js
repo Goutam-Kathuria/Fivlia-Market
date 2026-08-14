@@ -808,7 +808,7 @@ exports.getPlans = async (req, res) => {
     if (type === "product") {
       const plans = await ProductPlan.find(filter).sort({ createdAt: -1 });
 
-      const productSettings = await ProductSetting.findOne()
+      const productSettings = await Setting.findOne()
         .select("freeProductExpiryDays")
         .lean();
 
